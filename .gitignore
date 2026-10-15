@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+*/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Expo & Metro
+.expo/
+*/.expo/
+.eas/
+*/.eas/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+
+# Android / iOS Native Builds & Keystores
+android/
+ios/
+frontend/android/
+frontend/ios/
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.keystore
+*.mobileprovision
+*.apk
+*.aab
+
+# Local Environment & Secrets
+.env
+.env.*
+.env*.local
+!.env.example
+*.pem
+
+# Python & Backend Runtime
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+*.db
+*.sqlite
+*.sqlite3
+backend/data/*.db
+backend/data/*.sqlite
+backend/data/*.sqlite3
+
+# TypeScript & Cache
+*.tsbuildinfo
+
+# OS & Editor Artifacts
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo

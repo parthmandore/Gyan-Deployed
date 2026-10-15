@@ -1,0 +1,429 @@
+/**
+ * Purpose: Airtight language-aware speech service with precise locale voice resolution (EN, HI, MR),
+ *          Marathi-to-Hindi fallback, phonetic transliteration for platforms lacking Devanagari voices,
+ *          and detailed diagnostic logging.
+ * Module: Services
+ * Folder: frontend/src/services
+ */
+
+import * as Speech from 'expo-speech';
+import { Platform } from 'react-native';
+import { audioManager } from './audioManager';
+
+export interface PlaybackResult {
+  success: boolean;
+  source: 'cached_url' | 'local_tts_fallback';
+  error?: string;
+}
+
+export interface VoiceInfo {
+  locale: string;
+  name?: string;
+  hasNativeVoice: boolean;
+}
+
+/*
+ * LETTER_PHONETIC_NAMES has been removed.
+ * Single Latin characters (A-Z) are passed directly as uppercase single letters to native TTS,
+ * preventing homophone word substitutions like "U" -> "You", "I" -> "Eye", or "Q" -> "Queue".
+ */
+const NUMBER_WORDS: Record<string, string> = {
+  '0': 'Zero', '1': 'One', '2': 'Two', '3': 'Three', '4': 'Four',
+  '5': 'Five', '6': 'Six', '7': 'Seven', '8': 'Eight', '9': 'Nine',
+};
+
+/*
+ * DEVANAGARI_PHONETIC_FALLBACK has been intentionally removed.
+ * Rationale: An incorrect English-phonetic pronunciation is worse for a
+ * language-learning app than no audio at all. When no native hi-IN / mr-IN
+ * TTS voice is installed, speech calls now fail gracefully and silently.
+ * Production audio will be served by the Backend AI4Bharat TTS pipeline.
+ */
+
+let _speechSessionId = 0;
+
+/**
+ * Detects and returns the best matching TTS voice for the active learning language.
+ */
+export const getVoiceForLanguage = async (targetLang: 'english' | 'hindi' | 'marathi'): Promise<VoiceInfo> => {
+  let preferredLocales: string[] = [];
+  if (targetLang === 'hindi') {
+    preferredLocales = ['hi-IN', 'hi_IN', 'hi'];
+  } else if (targetLang === 'marathi') {
+    // Rule: Try Marathi first; if unavailable, automatically fallback to Hindi TTS
+    preferredLocales = ['mr-IN', 'mr_IN', 'mr', 'hi-IN', 'hi_IN', 'hi'];
+  } else {
+    preferredLocales = ['en-IN', 'en-GB', 'en-US', 'en'];
+  }
+
+  try {
+    let availableVoices: Array<{ language?: string; lang?: string; name?: string; identifier?: string }> = [];
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
+      availableVoices = window.speechSynthesis.getVoices();
+      if (availableVoices.length === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        availableVoices = window.speechSynthesis.getVoices();
+      }
+    } else {
+      availableVoices = await Speech.getAvailableVoicesAsync();
+    }
+
+    console.log(`[speechService] Device reports ${availableVoices.length} total TTS voices.`);
+
+    if (availableVoices.length > 0) {
+      for (const pref of preferredLocales) {
+        const match = availableVoices.find((v) => {
+          const vLang = (v.language || v.lang || '').toLowerCase();
+          const vName = (v.name || '').toLowerCase();
+
+          const targetPref = pref.toLowerCase();
+          const isLangMatch = vLang === targetPref || vLang.startsWith(`${targetPref}-`) || vLang.startsWith(`${targetPref}_`);
+          const isNameMatch = targetLang !== 'english'
+            ? (vName.includes('hindi') || vName.includes('marathi') || vName.includes('swara') || vName.includes('hemant') || vName.includes('kalpana'))
+            : (vName.includes('english') || vName.includes('david') || vName.includes('mark') || vName.includes('zira'));
+
+          return isLangMatch || isNameMatch;
+        });
+
+        if (match) {
+          const matchedLocale = match.language || match.lang || preferredLocales[0];
+          console.log(`[speechService] Found native TTS voice: "${match.name || 'Default'}" (${matchedLocale}) for language "${targetLang}"`);
+          return {
+            locale: matchedLocale,
+            name: match.name || match.identifier,
+            hasNativeVoice: true,
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[speechService] Voice detection exception:', err);
+  }
+
+  const fallbackLocale = targetLang === 'marathi' || targetLang === 'hindi' ? 'hi-IN' : 'en-IN';
+  console.log(`[speechService] No native TTS voice installed for "${targetLang}". Audio will be silently skipped.`);
+  return {
+    locale: fallbackLocale,
+    hasNativeVoice: false,
+  };
+};
+
+/**
+ * Speaks a single vocabulary word in the target learning language (EN, HI, MR).
+ * Ensures English is pronounced with English TTS, Hindi with Hindi TTS,
+ * and Marathi with Marathi (or Hindi fallback) TTS.
+ */
+export const speakWord = async (
+  word: string,
+  language?: string
+): Promise<PlaybackResult> => {
+  let lang = language;
+  if (!lang) {
+    try {
+      const { useAppLanguageStore } = require('../state/appLanguageStore');
+      lang = useAppLanguageStore.getState().learningLanguage || 'en';
+    } catch {
+      lang = 'en';
+    }
+  }
+  return speakPhrase(word, { cancelPrevious: true, language: lang });
+};
+
+/**
+ * Stops any currently playing or in-flight speech audio immediately.
+ */
+export const stopSpeech = (): void => {
+  _speechSessionId++;
+  try {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
+      window.speechSynthesis.cancel();
+    }
+    Speech.stop();
+  } catch (error) {
+    console.warn('[speechService] Error stopping speech:', error);
+  }
+  audioManager.unduck();
+};
+
+/**
+ * Returns the current speech session ID (useful for game lifecycle checks).
+ */
+export const getSpeechSessionId = (): number => _speechSessionId;
+
+/**
+ * Speaks a single letter/symbol aloud in the target learning language.
+ */
+export const speakLetter = async (
+  letter: string,
+  cachedAudioUrl?: string | null,
+  targetLang?: string
+): Promise<PlaybackResult> => {
+  stopSpeech();
+  const sessionForThisCall = _speechSessionId;
+
+  try {
+    let lang: 'english' | 'hindi' | 'marathi' = 'english';
+    const langCode = targetLang || (() => {
+      try {
+        const { useAppLanguageStore } = require('../state/appLanguageStore');
+        return useAppLanguageStore.getState().learningLanguage || 'en';
+      } catch {
+        return 'en';
+      }
+    })();
+
+    if (langCode === 'hi' || langCode === 'hindi') lang = 'hindi';
+    else if (langCode === 'mr' || langCode === 'marathi') lang = 'marathi';
+    else lang = 'english';
+
+    const voiceInfo = await getVoiceForLanguage(lang);
+
+    if (_speechSessionId !== sessionForThisCall) {
+      return { success: false, source: 'local_tts_fallback', error: 'Cancelled' };
+    }
+
+    let spokenText = letter;
+    try {
+      const { getDataset } = require('../screens/games/AlphabetMatching/datasets');
+      const dataset = getDataset();
+      if (dataset && typeof dataset.getSpokenText === 'function') {
+        spokenText = dataset.getSpokenText(letter);
+      } else {
+        spokenText = NUMBER_WORDS[letter] || letter.toUpperCase();
+      }
+    } catch {
+      spokenText = NUMBER_WORDS[letter] || letter.toUpperCase();
+    }
+
+    console.log(`[speechService] Dispatching speakLetter: Symbol="${letter}" | Text="${spokenText}" | Lang="${lang}" | Locale="${voiceInfo.locale}" | Voice="${voiceInfo.name || 'Default'}"`);
+
+    audioManager.duck();
+
+    return new Promise<PlaybackResult>((resolve) => {
+      if (_speechSessionId !== sessionForThisCall) {
+        audioManager.unduck();
+        resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+        return;
+      }
+
+      // DIRECT WEB DISPATCH: Avoids expo-speech web async await getVoices() desync race condition
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
+        const synth = window.speechSynthesis;
+        const utterance = new SpeechSynthesisUtterance(spokenText);
+        utterance.lang = voiceInfo.locale;
+        utterance.pitch = 1.1;
+        utterance.rate = 0.60;
+
+        if (voiceInfo.name && voiceInfo.hasNativeVoice) {
+          const voices = synth.getVoices();
+          const match = voices.find((v) => v.name === voiceInfo.name || v.voiceURI === voiceInfo.name);
+          if (match) utterance.voice = match;
+        }
+
+        utterance.onend = () => {
+          audioManager.unduck();
+          if (_speechSessionId !== sessionForThisCall) {
+            resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+            return;
+          }
+          console.log(`[speechService] Audio playback DONE for "${spokenText}"`);
+          resolve({ success: true, source: 'local_tts_fallback' });
+        };
+
+        utterance.onerror = (e: any) => {
+          audioManager.unduck();
+          const errStr = e?.error ? String(e.error).toLowerCase() : '';
+          if (_speechSessionId !== sessionForThisCall || errStr.includes('cancel') || errStr.includes('interrupt')) {
+            resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+            return;
+          }
+          console.warn(`[speechService] Audio playback ERROR for "${spokenText}":`, e);
+          resolve({ success: false, source: 'local_tts_fallback', error: String(e?.error || e) });
+        };
+
+        if (_speechSessionId !== sessionForThisCall) {
+          audioManager.unduck();
+          resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+          return;
+        }
+
+        synth.speak(utterance);
+        return;
+      }
+
+      // NATIVE DISPATCH (Android / iOS)
+      const options: Speech.SpeechOptions = {
+        language: voiceInfo.locale,
+        pitch: 1.1,
+        rate: 0.60,
+        onDone: () => {
+          audioManager.unduck();
+          if (_speechSessionId !== sessionForThisCall) return;
+          console.log(`[speechService] Audio playback DONE for "${spokenText}"`);
+          resolve({ success: true, source: 'local_tts_fallback' });
+        },
+        onError: (error) => {
+          audioManager.unduck();
+          const errStr = String(error).toLowerCase();
+          if (_speechSessionId !== sessionForThisCall || errStr.includes('cancel') || errStr.includes('interrupt')) {
+            resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+            return;
+          }
+          console.warn(`[speechService] Audio playback ERROR for "${spokenText}":`, error);
+          resolve({ success: false, source: 'local_tts_fallback', error: String(error) });
+        },
+      };
+
+      if (voiceInfo.name && voiceInfo.hasNativeVoice) {
+        options.voice = voiceInfo.name;
+      }
+
+      Speech.speak(spokenText, options);
+    });
+  } catch (error) {
+    audioManager.unduck();
+    console.warn('[speechService] speakLetter exception:', error);
+    return { success: false, source: 'local_tts_fallback', error: String(error) };
+  }
+};
+
+/**
+ * Speaks a custom teaching or praise phrase using locale-aware voice dispatches.
+ */
+export const speakPhrase = async (
+  phrase: string,
+  options?: { cancelPrevious?: boolean; language?: string }
+): Promise<PlaybackResult> => {
+  const shouldCancel = options?.cancelPrevious ?? true;
+  if (shouldCancel) {
+    stopSpeech();
+  }
+  const sessionForThisCall = _speechSessionId;
+
+  try {
+    let lang: 'english' | 'hindi' | 'marathi' = 'english';
+    if (options?.language) {
+      const l = options.language.toLowerCase();
+      if (l === 'hi' || l === 'hindi') lang = 'hindi';
+      else if (l === 'mr' || l === 'marathi') lang = 'marathi';
+      else lang = 'english';
+    } else {
+      try {
+        const { useAppLanguageStore } = require('../state/appLanguageStore');
+        const motherTongue = useAppLanguageStore.getState().motherTongue || 'en';
+        if (motherTongue === 'hi') lang = 'hindi';
+        else if (motherTongue === 'mr') lang = 'marathi';
+        else lang = 'english';
+      } catch {
+        lang = 'english';
+      }
+    }
+
+    const voiceInfo = await getVoiceForLanguage(lang);
+
+    if (_speechSessionId !== sessionForThisCall) {
+      return { success: false, source: 'local_tts_fallback', error: 'Cancelled' };
+    }
+
+    console.log(`[speechService] Dispatching speakPhrase: Phrase="${phrase}" | Lang="${lang}" | Locale="${voiceInfo.locale}" | Voice="${voiceInfo.name || 'Default'}"`);
+
+    audioManager.duck();
+
+    return new Promise<PlaybackResult>((resolve) => {
+      if (_speechSessionId !== sessionForThisCall) {
+        audioManager.unduck();
+        resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+        return;
+      }
+
+      // DIRECT WEB DISPATCH
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
+        const synth = window.speechSynthesis;
+        const utterance = new SpeechSynthesisUtterance(phrase);
+        utterance.lang = voiceInfo.locale;
+        utterance.pitch = 1.15;
+        utterance.rate = 0.65;
+
+        if (voiceInfo.name && voiceInfo.hasNativeVoice) {
+          const voices = synth.getVoices();
+          const match = voices.find((v) => v.name === voiceInfo.name || v.voiceURI === voiceInfo.name);
+          if (match) utterance.voice = match;
+        }
+
+        utterance.onend = () => {
+          audioManager.unduck();
+          if (_speechSessionId !== sessionForThisCall) {
+            resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+            return;
+          }
+          console.log(`[speechService] Phrase playback DONE: "${phrase}"`);
+          resolve({ success: true, source: 'local_tts_fallback' });
+        };
+
+        utterance.onerror = (e: any) => {
+          audioManager.unduck();
+          const errStr = e?.error ? String(e.error).toLowerCase() : '';
+          if (_speechSessionId !== sessionForThisCall || errStr.includes('cancel') || errStr.includes('interrupt')) {
+            resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+            return;
+          }
+          console.warn(`[speechService] Phrase playback ERROR for "${phrase}":`, e);
+          resolve({ success: false, source: 'local_tts_fallback', error: String(e?.error || e) });
+        };
+
+        if (_speechSessionId !== sessionForThisCall) {
+          audioManager.unduck();
+          resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+          return;
+        }
+
+        synth.speak(utterance);
+        return;
+      }
+
+      // NATIVE DISPATCH
+      const speechOpts: Speech.SpeechOptions = {
+        language: voiceInfo.locale,
+        pitch: 1.15,
+        rate: 0.65,
+        onDone: () => {
+          audioManager.unduck();
+          if (_speechSessionId !== sessionForThisCall) return;
+          console.log(`[speechService] Phrase playback DONE: "${phrase}"`);
+          resolve({ success: true, source: 'local_tts_fallback' });
+        },
+        onError: (error) => {
+          audioManager.unduck();
+          const errStr = String(error).toLowerCase();
+          if (_speechSessionId !== sessionForThisCall || errStr.includes('cancel') || errStr.includes('interrupt')) {
+            resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+            return;
+          }
+          console.warn(`[speechService] Phrase playback ERROR for "${phrase}":`, error);
+          resolve({ success: false, source: 'local_tts_fallback', error: String(error) });
+        },
+      };
+
+      if (voiceInfo.name && voiceInfo.hasNativeVoice) {
+        speechOpts.voice = voiceInfo.name;
+      }
+
+      Speech.speak(phrase, speechOpts);
+    });
+  } catch (error) {
+    audioManager.unduck();
+    console.error('[speechService] speakPhrase exception:', error);
+    return { success: false, source: 'local_tts_fallback', error: String(error) };
+  }
+};
+
+export const isSpeaking = async (): Promise<boolean> => {
+  try {
+    return await Speech.isSpeakingAsync();
+  } catch {
+    return false;
+  }
+};

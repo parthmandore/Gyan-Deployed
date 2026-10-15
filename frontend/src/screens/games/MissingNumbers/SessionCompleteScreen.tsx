@@ -1,0 +1,146 @@
+/**
+ * Purpose: Session Complete and Rewards screen for Missing Numbers.
+ *          Celebrates number counting completion with 3-star rating, XP tally,
+ *          spoken praise, and replay / catalog / dashboard navigation.
+ * Module: Missing Numbers — Session Complete Screen
+ * Folder: frontend/src/screens/games/MissingNumbers
+ */
+
+import React, { useEffect, useState, useRef } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+import { GameSessionCompleteView } from '../../../components';
+import { GameAnalysisReportModal, GameQuestionReportItem } from '../../../components/GameAnalysisReportModal';
+import { useAppLanguageStore } from '../../../state/appLanguageStore';
+import { useProgressStore } from '../../../state/useProgressStore';
+import { useMissingNumbersStore } from './store/useMissingNumbersStore';
+import { speakPhrase, stopSpeech } from '../../../services/speechService';
+import { MissingNumbersStackParamList } from './types';
+import { RootStackParamList } from '../../../types';
+
+type RouteProps = RouteProp<
+  MissingNumbersStackParamList,
+  'MissingNumbersSessionComplete'
+>;
+type NavProp = NativeStackNavigationProp<RootStackParamList, 'Games'>;
+
+export const SessionCompleteScreen: React.FC = React.memo(() => {
+  const { t } = useTranslation();
+  const navigation = useNavigation<NavProp>();
+  const route = useRoute<RouteProps>();
+  const [showReportModal, setShowReportModal] = useState(false);
+
+  const motherTongue = useAppLanguageStore((s) => s.motherTongue) || 'en';
+  const learningLanguage = useAppLanguageStore((s) => s.learningLanguage) || 'en';
+  const selectedAge = useAppLanguageStore((s) => s.selectedAge) || 5;
+
+  const resetGame = useMissingNumbersStore((s) => s.resetGame);
+  const attempts = useMissingNumbersStore((s) => s.attempts);
+
+  const {
+    starsEarned = 3,
+    xpEarned = 50,
+    itemsCorrect = 5,
+    sessionLength = 5,
+    accuracy = 100,
+  } = (route.params as any) || {};
+
+  const hasSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    if (hasSubmittedRef.current) return;
+    hasSubmittedRef.current = true;
+
+    useProgressStore.getState().recordSessionCompletion({
+      gameId: 'missing_numbers',
+      category: 'mathematics',
+      learningLanguage,
+      motherTongue,
+      age: selectedAge,
+      itemsAttempted: sessionLength,
+      itemsCorrect,
+      accuracy,
+      starsEarned,
+      xpEarned,
+      durationSeconds: 60,
+    });
+  }, [itemsCorrect, sessionLength, accuracy, starsEarned, xpEarned, learningLanguage, motherTongue, selectedAge]);
+
+  useEffect(() => {
+    const praiseText = t('missingNumbers.sessionCompletePraise', { lng: motherTongue });
+    speakPhrase(praiseText, { language: motherTongue });
+
+    const unsubscribe = navigation.addListener('beforeRemove', () => {
+      stopSpeech();
+    });
+
+    return () => {
+      unsubscribe();
+      stopSpeech();
+    };
+  }, [motherTongue, navigation, t]);
+
+  const handlePlayAgain = () => {
+    stopSpeech();
+    resetGame();
+    navigation.navigate('Games', { screen: 'MissingNumbersGame' as any });
+  };
+
+  const handleBackToDashboard = () => {
+    stopSpeech();
+    resetGame();
+    navigation.navigate('ChildDashboard' as any);
+  };
+
+  const handleBackToCatalog = () => {
+    stopSpeech();
+    resetGame();
+    navigation.navigate('GameCatalog' as any);
+  };
+
+  const reportItems: GameQuestionReportItem[] = attempts.map((att) => ({
+    roundNumber: att.roundNumber,
+    questionLabel: `Round ${att.roundNumber}: Missing Number`,
+    userAnswer: String(att.selectedValue),
+    correctAnswer: String(att.correctValue),
+    isCorrect: att.isCorrect,
+    attemptsCount: att.attemptCount,
+    xpEarned: att.isCorrect ? 10 : 0,
+  }));
+
+  return (
+    <View style={styles.root}>
+      <GameSessionCompleteView
+        gameTitle={t('games.missingNumbers.title', 'Missing Numbers')}
+        starsEarned={starsEarned}
+        itemsCorrect={itemsCorrect}
+        sessionLength={sessionLength}
+        accuracy={accuracy}
+        xpEarned={xpEarned}
+        onPlayAgain={handlePlayAgain}
+        onChooseGame={handleBackToCatalog}
+        onReturnToDashboard={handleBackToDashboard}
+        onViewReport={reportItems.length > 0 ? () => setShowReportModal(true) : undefined}
+        bgTheme="math"
+      />
+
+      <GameAnalysisReportModal
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        gameTitle={t('games.missingNumbers.title', 'Missing Numbers')}
+        items={reportItems}
+      />
+    </View>
+  );
+});
+
+SessionCompleteScreen.displayName = 'MissingNumbersSessionCompleteScreen';
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+});
