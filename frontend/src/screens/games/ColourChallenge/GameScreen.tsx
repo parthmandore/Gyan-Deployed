@@ -42,6 +42,7 @@ import { audioManager } from '../../../services/audioManager';
 import { speakPraise } from '../../../services/praiseService';
 import { triggerHapticSuccess, triggerHapticWarning } from '../../../services/hapticsService';
 import { RootStackParamList } from '../../../types';
+import { useGameSessionLifecycle } from '../../../hooks';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Games'>;
 
@@ -77,21 +78,19 @@ export const GameScreen: React.FC = React.memo(() => {
 
   const transitionTimeoutRef = useRef<any>(null);
 
+  const lifecycle = useGameSessionLifecycle({
+    gameId: 'colour_challenge',
+    sessionId,
+    onQuitModalToggle: setShowExitModal,
+    onCleanup: resetSession,
+    defaultExitDestination: 'GameCatalog',
+  });
+
   // Initialize rounds on mount
   useEffect(() => {
     const generatedRounds = generateColourRounds(selectedAge, learningLanguage);
     startSession(generatedRounds);
-
-    const unsubscribe = navigation.addListener('beforeRemove', () => {
-      stopSpeech();
-    });
-
-    return () => {
-      unsubscribe();
-      stopSpeech();
-      if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current);
-    };
-  }, [selectedAge, learningLanguage]);
+  }, [selectedAge, learningLanguage, startSession]);
 
   const currentRound: ColorRound | undefined = rounds[roundIndex];
 
@@ -105,45 +104,48 @@ export const GameScreen: React.FC = React.memo(() => {
 
     const prompt = t('colourChallenge.whatColour', { lng: motherTongue });
     speakPhrase(prompt, { language: motherTongue });
-  }, [roundIndex, currentRound, motherTongue]);
+  }, [roundIndex, currentRound, motherTongue, t]);
 
   // Complete session handler
   const handleCompleteSession = useCallback(
     async (finalCorrectCount: number, isTimeExpired = false) => {
-      const durationSeconds = Math.round((Date.now() - sessionStartTime) / 1000);
-      const totalRounds = rounds.length || TOTAL_COLOUR_ROUNDS;
-      const accuracy = Math.round((finalCorrectCount / totalRounds) * 100);
+      lifecycle.completeSession(async () => {
+        const durationSeconds = Math.round((Date.now() - sessionStartTime) / 1000);
+        const totalRounds = rounds.length || TOTAL_COLOUR_ROUNDS;
+        const accuracy = Math.round((finalCorrectCount / totalRounds) * 100);
 
-      const xpResult = await xpService.recordSessionCompletionXP({
-        sessionId,
-        gameId: 'colour_challenge',
-        age: selectedAge,
-        motherTongue,
-        learningLanguage,
-        totalQuestions: totalRounds,
-        correctAnswers: finalCorrectCount,
-        accuracy,
-        durationSeconds,
-      });
-
-      navigation.navigate('Games', {
-        screen: 'ColourChallengeSessionComplete' as any,
-        params: {
-          starsEarned: xpResult.starsEarned,
-          xpEarned: xpResult.totalSessionXp,
-          itemsCorrect: finalCorrectCount,
-          sessionLength: totalRounds,
+        const xpResult = await xpService.recordSessionCompletionXP({
+          sessionId,
+          gameId: 'colour_challenge',
+          age: selectedAge,
+          motherTongue,
+          learningLanguage,
+          totalQuestions: totalRounds,
+          correctAnswers: finalCorrectCount,
           accuracy,
-          isTimeExpired,
-        },
+          durationSeconds,
+        });
+
+        navigation.navigate('Games', {
+          screen: 'ColourChallengeSessionComplete' as any,
+          params: {
+            starsEarned: xpResult.starsEarned,
+            xpEarned: xpResult.totalSessionXp,
+            itemsCorrect: finalCorrectCount,
+            sessionLength: totalRounds,
+            accuracy,
+            isTimeExpired,
+          },
+        });
       });
     },
-    [sessionId, selectedAge, motherTongue, learningLanguage, rounds.length, sessionStartTime, navigation]
+    [lifecycle, sessionId, selectedAge, motherTongue, learningLanguage, rounds.length, sessionStartTime, navigation]
   );
 
   const handleTimeExpired = useCallback(() => {
+    if (lifecycle.statusRef.current !== 'active') return;
     handleCompleteSession(itemsCorrect, true);
-  }, [handleCompleteSession, itemsCorrect]);
+  }, [lifecycle, handleCompleteSession, itemsCorrect]);
 
   // Handle correct resolution for both visual and speech
   const handleRoundSuccess = useCallback(
@@ -186,7 +188,7 @@ export const GameScreen: React.FC = React.memo(() => {
       }, 500);
 
       // 4. Advance or complete after animation
-      transitionTimeoutRef.current = setTimeout(() => {
+      transitionTimeoutRef.current = lifecycle.safeSetTimeout(() => {
         setShowCelebration(false);
         const newCorrectCount = itemsCorrect + 1;
 
@@ -277,7 +279,7 @@ export const GameScreen: React.FC = React.memo(() => {
             });
           } catch {}
 
-          transitionTimeoutRef.current = setTimeout(() => {
+          transitionTimeoutRef.current = lifecycle.safeSetTimeout(() => {
             if (roundIndex + 1 < rounds.length) {
               nextRound();
             } else {
@@ -300,6 +302,7 @@ export const GameScreen: React.FC = React.memo(() => {
       nextRound,
       handleCompleteSession,
       itemsCorrect,
+      lifecycle,
     ]
   );
 
@@ -310,10 +313,8 @@ export const GameScreen: React.FC = React.memo(() => {
   }, [currentRound, learningLanguage]);
 
   const handleExitGame = () => {
-    stopSpeech();
-    audioManager.stopAllGameAudio();
     setShowExitModal(false);
-    navigation.navigate('GameCatalog');
+    lifecycle.exitSession('GameCatalog');
   };
 
   const containerWidth = Math.min(screenWidth - 32, 440);
@@ -351,6 +352,7 @@ export const GameScreen: React.FC = React.memo(() => {
             showExitModal ||
             showCorrectionModal
           }
+          isExited={lifecycle.isExited}
           containerWidth={containerWidth}
         />
 

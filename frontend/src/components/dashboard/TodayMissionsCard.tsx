@@ -9,6 +9,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BigTouchTarget } from '../BigTouchTarget';
 import { IslandPanel } from '../IslandPanel';
@@ -32,6 +33,7 @@ export const TodayMissionsCard: React.FC<TodayMissionsCardProps> = ({
   onSelectMission,
   onPressReward,
 }) => {
+  const { t } = useTranslation();
   const completedCount = missions.filter((m) => m.status === 'completed').length;
   const totalMissions = missions.length || 3;
   const isAllCompleted = completedCount >= totalMissions;
@@ -45,9 +47,9 @@ export const TodayMissionsCard: React.FC<TodayMissionsCardProps> = ({
     >
       {/* Quest Board Header */}
       <SectionHeader
-        title="TODAY'S ADVENTURE"
+        title={t('dashboard.todaysAdventure')}
         icon="🗺️"
-        badge={`🌟 ${completedCount} / ${totalMissions} Quests`}
+        badge={`🌟 ${completedCount} / ${totalMissions} ${t('dashboard.quests')}`}
       />
 
       {/* Mystery Reward Chest Banner */}
@@ -68,7 +70,7 @@ export const TodayMissionsCard: React.FC<TodayMissionsCardProps> = ({
         >
           {isAllCompleted
             ? '🎉 ALL 3 QUESTS DONE! TAP TO OPEN MYSTERY CHEST! 🎁'
-            : `🎯 Complete all 3 quests today to unlock the Mystery Chest! 🎁 (+30 XP)`}
+            : `🎯 ${t('dashboard.mysteryChestPrompt')}`}
         </Text>
       </BigTouchTarget>
 
@@ -141,10 +143,10 @@ export const TodayMissionsCard: React.FC<TodayMissionsCardProps> = ({
                   ]}
                 >
                   {isCompleted
-                    ? 'Completed! ⭐'
+                    ? `✓ ${t('dashboard.completed')}`
                     : isCurrent
-                    ? 'Tap to play now →'
-                    : 'Locked • Finish earlier quest'}
+                    ? t('dashboard.tapToPlay')
+                    : `🔒 ${t('dashboard.locked')}`}
                 </Text>
               </View>
 
@@ -155,7 +157,7 @@ export const TodayMissionsCard: React.FC<TodayMissionsCardProps> = ({
                     colors={['#4F46E5', '#4338CA']}
                     style={styles.playGradient}
                   >
-                    <Text style={styles.playActionText}>PLAY ▶</Text>
+                    <Text style={styles.playActionText}>{t('common.play')}</Text>
                   </LinearGradient>
                 </View>
               )}

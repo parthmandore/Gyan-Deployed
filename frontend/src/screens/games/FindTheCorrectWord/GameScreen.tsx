@@ -45,6 +45,7 @@ import { speakPraise } from '../../../services/praiseService';
 import { triggerHapticSuccess, triggerHapticWarning } from '../../../services/hapticsService';
 import { audioManager } from '../../../services/audioManager';
 import { RootStackParamList } from '../../../types';
+import { useGameSessionLifecycle } from '../../../hooks';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Games'>;
 
@@ -83,37 +84,20 @@ export const GameScreen: React.FC = React.memo(() => {
   const [sessionId] = useState(() => `fcw_${Date.now()}`);
 
   const transitionTimeoutRef = useRef<any>(null);
-  const isMountedRef = useRef(true);
+
+  const lifecycle = useGameSessionLifecycle({
+    gameId: 'find_the_correct_word',
+    sessionId,
+    onQuitModalToggle: setShowExitModal,
+    onCleanup: resetGame,
+    defaultExitDestination: 'GameCatalog',
+  });
 
   // Initialize session questions on mount
   useEffect(() => {
-    isMountedRef.current = true;
     const generatedRounds = generateFindCorrectWordQuestions(selectedAge, learningLanguage);
     startSession(generatedRounds);
-
-    const unsubscribeBeforeRemove = navigation.addListener('beforeRemove', () => {
-      isMountedRef.current = false;
-      stopSpeech();
-      audioManager.stopAllGameAudio();
-    });
-
-    const unsubscribeBlur = navigation.addListener('blur', () => {
-      isMountedRef.current = false;
-      stopSpeech();
-      audioManager.stopAllGameAudio();
-    });
-
-    return () => {
-      isMountedRef.current = false;
-      unsubscribeBeforeRemove();
-      unsubscribeBlur();
-      stopSpeech();
-      audioManager.stopAllGameAudio();
-      if (transitionTimeoutRef.current) {
-        clearTimeout(transitionTimeoutRef.current);
-      }
-    };
-  }, [selectedAge, learningLanguage, startSession, navigation]);
+  }, [selectedAge, learningLanguage, startSession]);
 
   const currentRound: CorrectWordQuestion | undefined = rounds[roundIndex];
 
@@ -136,50 +120,48 @@ export const GameScreen: React.FC = React.memo(() => {
   // Complete session handler
   const handleCompleteSession = useCallback(
     async (finalCorrectCount: number, isTimeExpired = false) => {
-      if (transitionTimeoutRef.current) {
-        clearTimeout(transitionTimeoutRef.current);
-      }
-      stopSpeech();
+      lifecycle.completeSession(async () => {
+        const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
+        const totalRounds = rounds.length || TOTAL_FIND_CORRECT_WORD_ROUNDS;
+        const accuracy = Math.round((finalCorrectCount / totalRounds) * 100);
 
-      const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
-      const totalRounds = rounds.length || TOTAL_FIND_CORRECT_WORD_ROUNDS;
-      const accuracy = Math.round((finalCorrectCount / totalRounds) * 100);
+        let starsEarned = 1;
+        let xpEarned = 50;
 
-      let starsEarned = 1;
-      let xpEarned = 50;
+        try {
+          const xpResult = await xpService.recordSessionCompletionXP({
+            sessionId,
+            gameId: 'find_the_correct_word',
+            age: selectedAge,
+            motherTongue,
+            learningLanguage,
+            totalQuestions: totalRounds,
+            correctAnswers: finalCorrectCount,
+            accuracy,
+            durationSeconds,
+          });
+          starsEarned = xpResult.starsEarned;
+          xpEarned = xpResult.totalSessionXp;
+        } catch {
+          starsEarned = finalCorrectCount >= 8 ? 3 : finalCorrectCount >= 5 ? 2 : 1;
+          xpEarned = starsEarned * 15;
+        }
 
-      try {
-        const xpResult = await xpService.recordSessionCompletionXP({
-          sessionId,
-          gameId: 'find_the_correct_word',
-          age: selectedAge,
-          motherTongue,
-          learningLanguage,
-          totalQuestions: totalRounds,
-          correctAnswers: finalCorrectCount,
-          accuracy,
-          durationSeconds,
+        navigation.navigate('Games', {
+          screen: 'FindTheCorrectWordSessionComplete' as any,
+          params: {
+            starsEarned,
+            xpEarned,
+            itemsCorrect: finalCorrectCount,
+            sessionLength: totalRounds,
+            accuracy,
+            isTimeExpired,
+          },
         });
-        starsEarned = xpResult.starsEarned;
-        xpEarned = xpResult.totalSessionXp;
-      } catch {
-        starsEarned = finalCorrectCount >= 8 ? 3 : finalCorrectCount >= 5 ? 2 : 1;
-        xpEarned = starsEarned * 15;
-      }
-
-      navigation.navigate('Games', {
-        screen: 'FindTheCorrectWordSessionComplete' as any,
-        params: {
-          starsEarned,
-          xpEarned,
-          itemsCorrect: finalCorrectCount,
-          sessionLength: totalRounds,
-          accuracy,
-          isTimeExpired,
-        },
       });
     },
     [
+      lifecycle,
       sessionId,
       selectedAge,
       motherTongue,
@@ -192,8 +174,9 @@ export const GameScreen: React.FC = React.memo(() => {
 
   // 90s Countdown Timer expiration
   const handleTimeExpired = useCallback(() => {
+    if (lifecycle.statusRef.current !== 'active') return;
     handleCompleteSession(itemsCorrect, true);
-  }, [handleCompleteSession, itemsCorrect]);
+  }, [lifecycle, handleCompleteSession, itemsCorrect]);
 
   // Pronounce word handler
   const handleHearWord = useCallback(() => {
@@ -245,8 +228,7 @@ export const GameScreen: React.FC = React.memo(() => {
         }, 700);
 
         // Advance to next round
-        transitionTimeoutRef.current = setTimeout(() => {
-          if (!isMountedRef.current) return;
+        transitionTimeoutRef.current = lifecycle.safeSetTimeout(() => {
           setShowCelebration(false);
           const newCorrectCount = itemsCorrect + 1;
 
@@ -292,8 +274,7 @@ export const GameScreen: React.FC = React.memo(() => {
           // Pronounce correct word
           speakWord(targetWord, learningLanguage);
 
-          transitionTimeoutRef.current = setTimeout(() => {
-            if (!isMountedRef.current) return;
+          transitionTimeoutRef.current = lifecycle.safeSetTimeout(() => {
             if (roundIndex + 1 < rounds.length) {
               nextRound();
             } else {
@@ -316,6 +297,7 @@ export const GameScreen: React.FC = React.memo(() => {
       rounds.length,
       nextRound,
       handleCompleteSession,
+      lifecycle,
     ]
   );
 
@@ -337,10 +319,8 @@ export const GameScreen: React.FC = React.memo(() => {
 
   // Early quit handler: clean up and return to catalog
   const handleConfirmExit = () => {
-    stopSpeech();
-    audioManager.stopAllGameAudio();
     setShowExitModal(false);
-    navigation.navigate('GameCatalog');
+    lifecycle.exitSession('GameCatalog');
   };
 
   const containerWidth = Math.min(screenWidth - 32, 420);
@@ -373,6 +353,7 @@ export const GameScreen: React.FC = React.memo(() => {
           initialSeconds={90}
           onExpire={handleTimeExpired}
           isPaused={showCorrectionModal || showExitModal || showCelebration}
+          isExited={lifecycle.isExited}
           containerWidth={containerWidth}
         />
 

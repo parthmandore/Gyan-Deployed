@@ -42,6 +42,7 @@ import { speakPhrase, stopSpeech } from '../../../services/speechService';
 import { audioManager } from '../../../services/audioManager';
 import { speakPraise } from '../../../services/praiseService';
 import { triggerHapticSuccess, triggerHapticWarning } from '../../../services/hapticsService';
+import { useGameSessionLifecycle } from '../../../hooks';
 import { RootStackParamList } from '../../../types';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Games'>;
@@ -50,6 +51,13 @@ export const GameScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+
+  // Unified Session Lifecycle
+  const lifecycle = useGameSessionLifecycle({
+    gameId: 'letter_tracing',
+    screenName: 'LetterTracingGame',
+    onQuitModalToggle: (visible) => setShowExitModal(visible),
+  });
 
   const motherTongue = useAppLanguageStore((s) => s.motherTongue) || 'en';
   const learningLanguage = useAppLanguageStore((s) => s.learningLanguage) || 'en';
@@ -125,39 +133,39 @@ export const GameScreen: React.FC = React.memo(() => {
 
   const finishSession = useCallback(
     async (finalCorrectCount: number, isTimeExpired = false) => {
-      if (isSessionFinishedRef.current) return;
-      isSessionFinishedRef.current = true;
-      setIsEvaluating(true);
-      stopSpeech();
+      lifecycle.completeSession(async () => {
+        setIsEvaluating(true);
+        stopSpeech();
 
-      const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
-      const accuracy = Math.round((finalCorrectCount / TOTAL_TRACING_ROUNDS) * 100);
+        const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
+        const accuracy = Math.round((finalCorrectCount / TOTAL_TRACING_ROUNDS) * 100);
 
-      const xpResult = await xpService.recordSessionCompletionXP({
-        sessionId,
-        gameId: 'letter_tracing',
-        age: selectedAge,
-        motherTongue,
-        learningLanguage,
-        totalQuestions: TOTAL_TRACING_ROUNDS,
-        correctAnswers: finalCorrectCount,
-        accuracy,
-        durationSeconds,
-      });
-
-      navigation.navigate('Games', {
-        screen: 'LetterTracingSessionComplete' as any,
-        params: {
-          starsEarned: xpResult.starsEarned,
-          xpEarned: xpResult.totalSessionXp,
-          itemsCorrect: finalCorrectCount,
-          sessionLength: TOTAL_TRACING_ROUNDS,
+        const xpResult = await xpService.recordSessionCompletionXP({
+          sessionId,
+          gameId: 'letter_tracing',
+          age: selectedAge,
+          motherTongue,
+          learningLanguage,
+          totalQuestions: TOTAL_TRACING_ROUNDS,
+          correctAnswers: finalCorrectCount,
           accuracy,
-          isTimeExpired,
-        },
+          durationSeconds,
+        });
+
+        navigation.navigate('Games', {
+          screen: 'LetterTracingSessionComplete' as any,
+          params: {
+            starsEarned: xpResult.starsEarned,
+            xpEarned: xpResult.totalSessionXp,
+            itemsCorrect: finalCorrectCount,
+            sessionLength: TOTAL_TRACING_ROUNDS,
+            accuracy,
+            isTimeExpired,
+          },
+        });
       });
     },
-    [sessionId, selectedAge, motherTongue, learningLanguage, sessionStartTime, navigation]
+    [lifecycle, sessionId, selectedAge, motherTongue, learningLanguage, sessionStartTime, navigation]
   );
 
   const handleTimeExpired = useCallback(() => {
@@ -205,7 +213,7 @@ export const GameScreen: React.FC = React.memo(() => {
 
       const finalCorrectCount = itemsCorrect + 1;
 
-      setTimeout(async () => {
+      lifecycle.safeSetTimeout(async () => {
         setShowCelebration(false);
         setIsEvaluating(false);
 
@@ -247,7 +255,7 @@ export const GameScreen: React.FC = React.memo(() => {
           gameId: 'letter_tracing',
         });
 
-        setTimeout(async () => {
+        lifecycle.safeSetTimeout(async () => {
           if (roundIndex + 1 >= TOTAL_TRACING_ROUNDS) {
             finishSession(itemsCorrect);
           } else {
@@ -259,10 +267,8 @@ export const GameScreen: React.FC = React.memo(() => {
   };
 
   const handleExitConfirm = () => {
-    stopSpeech();
-    audioManager.stopAllGameAudio();
     setShowExitModal(false);
-    navigation.navigate('GameCatalog');
+    lifecycle.exitSession('GameCatalog');
   };
 
   if (!currentRound) {
@@ -296,6 +302,7 @@ export const GameScreen: React.FC = React.memo(() => {
           initialSeconds={90}
           onTimeExpired={handleTimeExpired}
           isPaused={showCorrectionModal || showCelebration || showExitModal}
+          isExited={lifecycle.isExited}
           containerWidth={containerWidth}
         />
 

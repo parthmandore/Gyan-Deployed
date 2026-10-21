@@ -18,20 +18,27 @@ import { LanguageGateScreen } from '../screens/LanguageGateScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { GamesNavigator } from './GamesNavigator';
 import { useAppLanguageStore } from '../state/appLanguageStore';
+import { useAuthStore } from '../state/authStore';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const RootNavigator: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
+  const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Login');
   const initLanguage = useAppLanguageStore((s) => s.initLanguage);
+  const restoreSession = useAuthStore((s) => s.restoreSession);
 
   useEffect(() => {
     let isMounted = true;
     const prepareApp = async () => {
       try {
         await initLanguage();
+        const hasSession = await restoreSession();
+        if (hasSession && isMounted) {
+          setInitialRoute('ChildDashboard');
+        }
       } catch (err) {
-        console.warn('[RootNavigator] Language init warning:', err);
+        console.warn('[RootNavigator] Startup init warning:', err);
       } finally {
         if (isMounted) {
           setIsReady(true);
@@ -42,7 +49,7 @@ export const RootNavigator: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [initLanguage]);
+  }, [initLanguage, restoreSession]);
 
   if (!isReady) {
     return (
@@ -53,7 +60,7 @@ export const RootNavigator: React.FC = () => {
   }
 
   return (
-    <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="SignUpProfile" component={SignUpProfileScreen} />
       <Stack.Screen name="ChildDashboard" component={ChildDashboardScreen} />

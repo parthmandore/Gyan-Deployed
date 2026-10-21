@@ -41,6 +41,7 @@ import { audioManager } from '../../../services/audioManager';
 import { speakPraise } from '../../../services/praiseService';
 import { triggerHapticSuccess, triggerHapticWarning } from '../../../services/hapticsService';
 import { RootStackParamList } from '../../../types';
+import { useGameSessionLifecycle } from '../../../hooks';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Games'>;
 type RouteProps = RouteProp<MathChallengeStackParamList, 'MathChallengeGame'>;
@@ -80,26 +81,22 @@ export const GameScreen: React.FC = React.memo(() => {
   const [sessionId] = useState(() => `math_${operation}_${Date.now()}`);
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
   const [wrongSelectedValue, setWrongSelectedValue] = useState<number | null>(null);
-  const isSessionFinishedRef = useRef(false);
 
   const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const lifecycle = useGameSessionLifecycle({
+    gameId: `math_${operation}`,
+    sessionId,
+    onQuitModalToggle: setShowExitModal,
+    onCleanup: resetSession,
+    defaultExitDestination: 'GameCatalog',
+  });
 
   // Initialize session rounds
   useEffect(() => {
     const newRounds = generateMathSession(operation);
     startSession(operation, newRounds);
-
-    const unsubscribe = navigation.addListener('beforeRemove', () => {
-      stopSpeech();
-      if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current);
-    });
-
-    return () => {
-      stopSpeech();
-      if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current);
-      unsubscribe();
-    };
-  }, [operation, startSession, navigation]);
+  }, [operation, startSession]);
 
   const currentRound: MathRound | undefined = rounds[roundIndex];
 
@@ -122,45 +119,46 @@ export const GameScreen: React.FC = React.memo(() => {
 
   const finishSession = useCallback(
     async (finalCorrectCount: number, isTimeExpired = false) => {
-      if (isSessionFinishedRef.current) return;
-      isSessionFinishedRef.current = true;
-      setIsRoundLocked(true);
-      stopSpeech();
+      lifecycle.completeSession(async () => {
+        setIsRoundLocked(true);
+        stopSpeech();
 
-      const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
-      const accuracy = Math.round((finalCorrectCount / TOTAL_MATH_ROUNDS) * 100);
+        const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
+        const accuracy = Math.round((finalCorrectCount / TOTAL_MATH_ROUNDS) * 100);
 
-      const xpResult = await xpService.recordSessionCompletionXP({
-        sessionId,
-        gameId: operation,
-        age: selectedAge,
-        motherTongue,
-        learningLanguage,
-        totalQuestions: TOTAL_MATH_ROUNDS,
-        correctAnswers: finalCorrectCount,
-        accuracy,
-        durationSeconds,
-      });
-
-      navigation.navigate('Games', {
-        screen: 'MathChallengeSessionComplete' as any,
-        params: {
-          operation,
-          starsEarned: xpResult.starsEarned,
-          xpEarned: xpResult.totalSessionXp,
-          itemsCorrect: finalCorrectCount,
-          sessionLength: TOTAL_MATH_ROUNDS,
+        const xpResult = await xpService.recordSessionCompletionXP({
+          sessionId,
+          gameId: operation,
+          age: selectedAge,
+          motherTongue,
+          learningLanguage,
+          totalQuestions: TOTAL_MATH_ROUNDS,
+          correctAnswers: finalCorrectCount,
           accuracy,
-          isTimeExpired,
-        },
+          durationSeconds,
+        });
+
+        navigation.navigate('Games', {
+          screen: 'MathChallengeSessionComplete' as any,
+          params: {
+            operation,
+            starsEarned: xpResult.starsEarned,
+            xpEarned: xpResult.totalSessionXp,
+            itemsCorrect: finalCorrectCount,
+            sessionLength: TOTAL_MATH_ROUNDS,
+            accuracy,
+            isTimeExpired,
+          },
+        });
       });
     },
-    [sessionId, operation, selectedAge, motherTongue, learningLanguage, sessionStartTime, navigation]
+    [lifecycle, sessionId, operation, selectedAge, motherTongue, learningLanguage, sessionStartTime, navigation]
   );
 
   const handleTimeExpired = useCallback(() => {
+    if (lifecycle.statusRef.current !== 'active') return;
     finishSession(itemsCorrect, true);
-  }, [finishSession, itemsCorrect]);
+  }, [lifecycle, finishSession, itemsCorrect]);
 
   const handleOptionPress = useCallback(
     async (option: MathOption) => {
@@ -199,7 +197,7 @@ export const GameScreen: React.FC = React.memo(() => {
 
         const newCorrectCount = itemsCorrect + 1;
 
-        transitionTimeoutRef.current = setTimeout(async () => {
+        transitionTimeoutRef.current = lifecycle.safeSetTimeout(async () => {
           setShowCelebration(false);
 
           if (roundIndex + 1 < rounds.length) {
@@ -239,7 +237,7 @@ export const GameScreen: React.FC = React.memo(() => {
             gameId: operation,
           });
 
-          transitionTimeoutRef.current = setTimeout(async () => {
+          transitionTimeoutRef.current = lifecycle.safeSetTimeout(async () => {
             if (roundIndex + 1 < rounds.length) {
               nextRound();
             } else {
@@ -263,14 +261,13 @@ export const GameScreen: React.FC = React.memo(() => {
       nextRound,
       t,
       finishSession,
+      lifecycle,
     ]
   );
 
   const handleExitConfirm = () => {
-    stopSpeech();
-    audioManager.stopAllGameAudio();
     setShowExitModal(false);
-    navigation.navigate('GameCatalog');
+    lifecycle.exitSession('GameCatalog');
   };
 
   if (!currentRound) {
@@ -304,6 +301,7 @@ export const GameScreen: React.FC = React.memo(() => {
           initialSeconds={90}
           onTimeExpired={handleTimeExpired}
           isPaused={showCorrectionModal || showCelebration || showExitModal}
+          isExited={lifecycle.isExited}
           containerWidth={containerWidth}
         />
 

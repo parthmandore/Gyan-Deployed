@@ -25,6 +25,7 @@ export interface GameHUDProps {
   onTimeExpired?: () => void;
   onExpire?: () => void;
   isPaused?: boolean;
+  isExited?: boolean;
   roundResults?: Array<'correct' | 'wrong' | 'pending'>;
   scoreSuffix?: string;
   containerWidth?: number;
@@ -41,6 +42,7 @@ export const GameHUD: React.FC<GameHUDProps> = React.memo(
     onTimeExpired,
     onExpire,
     isPaused = false,
+    isExited = false,
     roundResults,
     scoreSuffix = 'XP',
     containerWidth,
@@ -75,6 +77,7 @@ export const GameHUD: React.FC<GameHUDProps> = React.memo(
                 onTimeExpired={onTimeExpired || onExpire}
                 onExpire={onExpire || onTimeExpired}
                 isPaused={isPaused}
+                isExited={isExited}
               />
             </View>
           )}

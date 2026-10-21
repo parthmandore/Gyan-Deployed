@@ -51,6 +51,7 @@ import { speakLetter, speakPhrase, stopSpeech } from '../../../services/speechSe
 import { audioManager } from '../../../services/audioManager';
 import { speakPraise, resetPraiseRotation } from '../../../services/praiseService';
 import { triggerHapticSuccess, triggerHapticWarning } from '../../../services/hapticsService';
+import { useGameSessionLifecycle } from '../../../hooks';
 import { arrangeGridAvoidingConfusion } from './utils/gridArrangement';
 import {
   DEFAULT_DIFFICULTY_TIER,
@@ -76,6 +77,13 @@ export const GameScreen: React.FC = React.memo(() => {
   const navigation = useNavigation<NativeStackNavigationProp<AlphabetMatchingStackParamList>>();
 
   const { width: screenWidth } = useWindowDimensions();
+
+  // Unified Session Lifecycle
+  const lifecycle = useGameSessionLifecycle({
+    gameId: 'alphabet_matching',
+    screenName: 'AlphabetMatchingGame',
+    onQuitModalToggle: (visible) => setShowExitModal(visible),
+  });
 
   const isAudioLoading = useSpeechPlaybackStore((s) => s.isLoading);
   const setIsAudioLoading = useSpeechPlaybackStore((s) => s.setLoading);
@@ -175,47 +183,47 @@ export const GameScreen: React.FC = React.memo(() => {
   }, [currentDifficulty, gridOpacity, gridScale, playLetterAudio]);
 
   const finishSessionAndSubmitProgress = useCallback(async () => {
-    setShowCelebration(false);
-    setShowTeaching(false);
-    setShowFlyingStar(false);
-    stopSpeech();
+    lifecycle.completeSession(async () => {
+      setShowCelebration(false);
+      setShowTeaching(false);
+      setShowFlyingStar(false);
+      stopSpeech();
 
-    await new Promise((resolve) => setTimeout(resolve, 30));
+      const finalState = useAlphabetMatchingStore.getState();
+      const finalDifficulty = currentDifficulty;
+      const sessionStart = sessionStartTimeRef.current;
+      const finalAttempted = finalState.itemsAttempted;
+      const finalCorrect = finalState.itemsCorrect;
 
-    const finalState = useAlphabetMatchingStore.getState();
-    const finalDifficulty = currentDifficulty;
-    const sessionStart = sessionStartTimeRef.current;
-    const finalAttempted = finalState.itemsAttempted;
-    const finalCorrect = finalState.itemsCorrect;
+      const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStart) / 1000));
+      const accuracy = finalAttempted > 0 ? (finalCorrect / finalAttempted) * 100 : 0;
+      const starsEarned = Math.min(3, Math.max(1, Math.ceil((finalCorrect / (sessionLength || 10)) * 3)));
+      const xpEarned = starsEarned * 50 + finalCorrect * 10;
 
-    const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStart) / 1000));
-    const accuracy = finalAttempted > 0 ? (finalCorrect / finalAttempted) * 100 : 0;
-    const starsEarned = Math.min(3, Math.max(1, Math.ceil((finalCorrect / (sessionLength || 10)) * 3)));
-    const xpEarned = starsEarned * 50 + finalCorrect * 10;
+      try {
+        await submitGameProgress({
+          game_type: 'alphabet_matching',
+          difficulty: finalDifficulty,
+          items_attempted: finalAttempted,
+          items_correct: finalCorrect,
+          time_taken_seconds: durationSeconds,
+        });
+      } catch (err) {
+        console.warn('[GameScreen] Non-critical progress submission failure (mock handling ok):', err);
+      }
 
-    try {
-      await submitGameProgress({
-        game_type: 'alphabet_matching',
-        difficulty: finalDifficulty,
-        items_attempted: finalAttempted,
-        items_correct: finalCorrect,
-        time_taken_seconds: durationSeconds,
+      navigation.navigate('AlphabetMatchingSessionComplete', {
+        starsEarned,
+        xpEarned,
+        itemsCorrect: finalCorrect,
+        sessionLength,
+        accuracy,
+        durationSeconds,
+        sessionResults: roundResults,
+        rounds: rounds.map((r) => ({ target_letter: r.target_letter })),
       });
-    } catch (err) {
-      console.warn('[GameScreen] Non-critical progress submission failure (mock handling ok):', err);
-    }
-
-    navigation.navigate('AlphabetMatchingSessionComplete', {
-      starsEarned,
-      xpEarned,
-      itemsCorrect: finalCorrect,
-      sessionLength,
-      accuracy,
-      durationSeconds,
-      sessionResults: roundResults,
-      rounds: rounds.map((r) => ({ target_letter: r.target_letter })),
     });
-  }, [currentDifficulty, navigation, sessionLength, roundResults, rounds]);
+  }, [lifecycle, currentDifficulty, navigation, sessionLength, roundResults, rounds]);
 
   const advanceToNextRound = useCallback(() => {
     setLifecycleState('ADVANCING_NEXT_ROUND');
@@ -266,7 +274,7 @@ export const GameScreen: React.FC = React.memo(() => {
       store.recordAttempt(false);
       setItemsAttempted((prev) => prev + 1);
 
-      setTimeout(() => {
+      lifecycle.safeSetTimeout(() => {
         setLifecycleState('TEACHING_POPUP');
         setShowTeaching(true);
       }, 220);
@@ -294,11 +302,11 @@ export const GameScreen: React.FC = React.memo(() => {
 
       setTileStates(updatedTileStates);
 
-      setTimeout(() => {
+      lifecycle.safeSetTimeout(() => {
         advanceToNextRound();
       }, 1000);
     }
-  }, [roundLocked, currentRound, targetChar, roundIndex, attemptsInCurrentRound, currentOptions, mode, advanceToNextRound]);
+  }, [roundLocked, currentRound, targetChar, roundIndex, attemptsInCurrentRound, currentOptions, mode, advanceToNextRound, lifecycle]);
 
   useEffect(() => {
     if (timerSeconds === 0 && (lifecycleState === 'WAITING_FOR_SELECTION' || lifecycleState === 'SECOND_ATTEMPT') && !roundLocked) {
@@ -377,7 +385,7 @@ export const GameScreen: React.FC = React.memo(() => {
       setShowCelebration(true);
       speakPraise();
 
-      setTimeout(() => {
+      lifecycle.safeSetTimeout(() => {
         setShowCelebration(false);
         advanceToNextRound();
       }, CORRECT_ANSWER_CELEBRATION_DURATION_MS);
@@ -391,7 +399,7 @@ export const GameScreen: React.FC = React.memo(() => {
 
         setTileStates((prev) => ({ ...prev, [tappedLetter]: 'incorrect' }));
 
-        setTimeout(() => {
+        lifecycle.safeSetTimeout(() => {
           setLifecycleState('TEACHING_POPUP');
           setShowTeaching(true);
         }, 220);
@@ -420,12 +428,12 @@ export const GameScreen: React.FC = React.memo(() => {
         const activeDataset = getDataset(mode);
         speakPhrase(activeDataset.getTeachingText(targetChar));
 
-        setTimeout(() => {
+        lifecycle.safeSetTimeout(() => {
           advanceToNextRound();
         }, SECOND_WRONG_AUTO_ADVANCE_DELAY_MS);
       }
     }
-  }, [roundLocked, currentRound, targetChar, roundIndex, attemptsInCurrentRound, currentOptions, mode, advanceToNextRound]);
+  }, [roundLocked, currentRound, targetChar, roundIndex, attemptsInCurrentRound, currentOptions, mode, advanceToNextRound, lifecycle]);
 
   const handleFlyingStarComplete = useCallback(() => {
     setShowFlyingStar(false);
@@ -467,10 +475,8 @@ export const GameScreen: React.FC = React.memo(() => {
     setShowCelebration(false);
     setShowTeaching(false);
     setShowFlyingStar(false);
-    stopSpeech();
-    audioManager.stopAllGameAudio();
-    (navigation as any).navigate('GameCatalog');
-  }, [navigation]);
+    lifecycle.exitSession('GameCatalog');
+  }, [lifecycle]);
 
   const totalOptionsCount = getGridSizeForDifficulty(currentDifficulty);
   const numColumns = totalOptionsCount > 4 ? 3 : 2;
@@ -509,6 +515,7 @@ export const GameScreen: React.FC = React.memo(() => {
           score={itemsCorrect * 10}
           roundResults={roundResults}
           timerDisabled={true}
+          isExited={lifecycle.isExited}
         />
 
         {/* Main Content Area */}

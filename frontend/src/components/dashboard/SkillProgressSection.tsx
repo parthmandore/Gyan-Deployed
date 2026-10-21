@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { BigTouchTarget } from '../BigTouchTarget';
 import { IslandPanel } from '../IslandPanel';
 import { SectionHeader } from '../SectionHeader';
@@ -98,6 +99,8 @@ export const SkillProgressSection: React.FC<SkillProgressSectionProps> = ({
   skills,
   onSelectSkill,
 }) => {
+  const { t } = useTranslation();
+
   return (
     <IslandPanel
       variant="frosted"
@@ -107,9 +110,9 @@ export const SkillProgressSection: React.FC<SkillProgressSectionProps> = ({
     >
       {/* Section Header */}
       <SectionHeader
-        title="MY LEARNING JOURNEY"
+        title={t('dashboard.learningJourney')}
         icon="🌟"
-        badge={`${skills.length || 8} Skills`}
+        badge={`${skills.length || 8} ${t('dashboard.skills')}`}
       />
 
       {/* Responsive Skill Islands Grid */}
@@ -117,6 +120,9 @@ export const SkillProgressSection: React.FC<SkillProgressSectionProps> = ({
         {skills.map((skill) => {
           const theme = SKILL_THEMES[skill.skill_id] || DEFAULT_THEME;
           const accuracyClamped = Math.min(100, Math.max(0, skill.accuracy || 0));
+          const localizedTitle = t(`realms.${skill.skill_id}.name`, skill.title);
+          const masteryKey = skill.mastery ? skill.mastery.toLowerCase() : 'explorer';
+          const localizedMastery = t(`dashboard.mastery.${masteryKey}`, skill.mastery || 'Explorer');
 
           return (
             <BigTouchTarget
@@ -129,7 +135,7 @@ export const SkillProgressSection: React.FC<SkillProgressSectionProps> = ({
                   borderColor: theme.border,
                 },
               ]}
-              accessibilityLabel={`${skill.title}, mastery: ${skill.mastery}, accuracy: ${accuracyClamped}%`}
+              accessibilityLabel={`${localizedTitle}, mastery: ${localizedMastery}, accuracy: ${accuracyClamped}%`}
               accessibilityRole="button"
             >
               {/* Header: Emoji Icon + Mastery Chip */}
@@ -142,7 +148,7 @@ export const SkillProgressSection: React.FC<SkillProgressSectionProps> = ({
                   ]}
                 >
                   <Text style={[styles.masteryText, { color: theme.accent }]}>
-                    {skill.mastery || 'Explorer'}
+                    {localizedMastery}
                   </Text>
                 </View>
               </View>
@@ -152,7 +158,7 @@ export const SkillProgressSection: React.FC<SkillProgressSectionProps> = ({
                 style={[styles.skillTitle, { color: theme.text }]}
                 numberOfLines={2}
               >
-                {skill.title}
+                {localizedTitle}
               </Text>
 
               {/* Progress Track & Accuracy */}

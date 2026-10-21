@@ -8,6 +8,7 @@
 
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Modal } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BigTouchTarget } from '../BigTouchTarget';
 import { IslandPanel } from '../IslandPanel';
@@ -28,6 +29,7 @@ interface AchievementsGalleryProps {
 export const AchievementsGallery: React.FC<AchievementsGalleryProps> = ({
   achievements,
 }) => {
+  const { t } = useTranslation();
   const [selectedBadge, setSelectedBadge] = useState<AchievementItem | null>(null);
 
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
@@ -50,9 +52,9 @@ export const AchievementsGallery: React.FC<AchievementsGalleryProps> = ({
     >
       {/* Header */}
       <SectionHeader
-        title="MY TROPHY SHELF"
+        title={t('dashboard.trophyShelf')}
         icon="🏆"
-        badge={`⭐ ${unlockedCount} / ${achievements.length} Unlocked`}
+        badge={`⭐ ${unlockedCount} / ${achievements.length} ${t('dashboard.trophies')}`}
       />
 
       {/* Collectible Trophies Carousel */}

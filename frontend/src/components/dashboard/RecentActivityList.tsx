@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { IslandPanel } from '../IslandPanel';
 import { SectionHeader } from '../SectionHeader';
 import {
@@ -23,6 +24,8 @@ interface RecentActivityListProps {
 }
 
 export const RecentActivityList: React.FC<RecentActivityListProps> = ({ activities }) => {
+  const { t } = useTranslation();
+
   if (!activities || activities.length === 0) {
     return (
       <IslandPanel
@@ -31,12 +34,12 @@ export const RecentActivityList: React.FC<RecentActivityListProps> = ({ activiti
         style={styles.islandContainer}
         padding="md"
       >
-        <SectionHeader title="ADVENTURE TRAIL" icon="📜" />
+        <SectionHeader title={t('dashboard.adventureTrail')} icon="📜" />
         <View style={styles.emptyTrailBox}>
           <Text style={styles.emptyTrailIcon}>🌱</Text>
-          <Text style={styles.emptyTrailTitle}>Your adventure trail begins here!</Text>
+          <Text style={styles.emptyTrailTitle}>{t('dashboard.trailEmptyTitle')}</Text>
           <Text style={styles.emptyTrailSubtext}>
-            Complete your first quest today to leave your footprints on the trail! 🐾
+            {t('dashboard.trailEmptySubtitle')}
           </Text>
         </View>
       </IslandPanel>
@@ -52,9 +55,9 @@ export const RecentActivityList: React.FC<RecentActivityListProps> = ({ activiti
     >
       {/* Header */}
       <SectionHeader
-        title="ADVENTURE TRAIL"
+        title={t('dashboard.adventureTrail')}
         icon="📜"
-        badge="Recent Quests"
+        badge={t('dashboard.recentQuests')}
       />
 
       {/* Vertical Timeline Path */}

@@ -43,6 +43,7 @@ import { triggerHapticSuccess, triggerHapticWarning } from '../../../services/ha
 import { speakPhrase, stopSpeech } from '../../../services/speechService';
 import { audioManager } from '../../../services/audioManager';
 import { xpService } from '../../../services/xpService';
+import { useGameSessionLifecycle } from '../../../hooks';
 
 type NavProp = NativeStackNavigationProp<VowelMatraMatchStackParamList>;
 
@@ -56,6 +57,13 @@ const TOTAL_ROUNDS = 3;
 export const GameScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
+
+  // Unified Session Lifecycle
+  const lifecycle = useGameSessionLifecycle({
+    gameId: 'vowel_matra_match',
+    screenName: 'VowelMatraMatchGame',
+    onQuitModalToggle: (visible) => setShowExitModal(visible),
+  });
 
   // Determine language dataset based on learningLanguage
   const learningLanguage = useAppLanguageStore((s) => s.learningLanguage) || 'hi';
@@ -90,8 +98,6 @@ export const GameScreen: React.FC = React.memo(() => {
 
   // Teaching Modal & UI feedback state
   const [teachingModalPair, setTeachingModalPair] = useState<{ capital: string; lowercase: string } | null>(null);
-  const [timeLeft, setTimeLeft] = useState<number>(INITIAL_TIMER_SECONDS);
-  const timeExpiredRef = useRef(false);
   const [wrongFlashPair, setWrongFlashPair] = useState<{ vowel: string; matraForm: string } | null>(null);
   const [justMatchedVowel, setJustMatchedVowel] = useState<string | null>(null);
   const [showRoundCelebration, setShowRoundCelebration] = useState(false);
@@ -131,52 +137,32 @@ export const GameScreen: React.FC = React.memo(() => {
     };
   }, [roundPairs.length, activeDataset, setRound, sessionStartTime, setSessionStartTime, navigation]);
 
-  // --- 50s Countdown Timer ---
+  // Session complete handler guarded by lifecycle
+  const handleSessionEnd = useCallback(() => {
+    lifecycle.completeSession(async () => {
+      const duration = sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 1000) : INITIAL_TIMER_SECONDS;
+      const accuracy = itemsAttempted > 0 ? Math.round((itemsCorrect / itemsAttempted) * 100) : 100;
+      const starsEarned = accuracy >= 90 ? 3 : accuracy >= 70 ? 2 : 1;
+      const xpEarned = score > 0 ? score : itemsCorrect * 10;
+
+      navigation.navigate('VowelMatraMatchSessionComplete', {
+        sessionId: sessionIdRef.current,
+        starsEarned,
+        xpEarned,
+        itemsCorrect,
+        sessionLength: SESSION_TOTAL_PAIRS,
+        accuracy,
+        durationSeconds: duration,
+        sessionResults,
+      });
+    });
+  }, [lifecycle, sessionStartTime, itemsAttempted, itemsCorrect, score, navigation, sessionResults]);
+
+  // --- 50s Countdown Timer expiration handler ---
   const handleTimeUp = useCallback(() => {
     setInteractionLocked(true);
-    const duration = sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 1000) : INITIAL_TIMER_SECONDS;
-    const accuracy = itemsAttempted > 0 ? Math.round((itemsCorrect / itemsAttempted) * 100) : 100;
-    const starsEarned = accuracy >= 90 ? 3 : accuracy >= 70 ? 2 : 1;
-    const xpEarned = score > 0 ? score : itemsCorrect * 10;
-
-    navigation.navigate('VowelMatraMatchSessionComplete', {
-      sessionId: sessionIdRef.current,
-      starsEarned,
-      xpEarned,
-      itemsCorrect,
-      sessionLength: SESSION_TOTAL_PAIRS,
-      accuracy,
-      durationSeconds: duration,
-      sessionResults,
-    });
-  }, [sessionStartTime, itemsAttempted, itemsCorrect, score, navigation, sessionResults]);
-
-  useEffect(() => {
-    if (roundPairs.length === 0 || interactionLocked || teachingModalPair !== null) return;
-
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          // Bug 3 fix: Don't call handleTimeUp() inside setState updater.
-          // Set a ref flag instead; a separate effect will handle navigation.
-          timeExpiredRef.current = true;
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [roundPairs.length, interactionLocked, teachingModalPair]);
-
-  // Bug 3 fix: Handle time expiry in a separate effect, not inside setState updater
-  useEffect(() => {
-    if (timeLeft === 0 && timeExpiredRef.current) {
-      timeExpiredRef.current = false;
-      handleTimeUp();
-    }
-  }, [timeLeft, handleTimeUp]);
+    handleSessionEnd();
+  }, [handleSessionEnd]);
 
   // --- Detect round completion ---
   useEffect(() => {
@@ -188,27 +174,13 @@ export const GameScreen: React.FC = React.memo(() => {
     setInteractionLocked(true);
     setShowRoundCelebration(true);
 
-    const timer = setTimeout(() => {
+    const timer = lifecycle.safeSetTimeout(() => {
       setShowRoundCelebration(false);
       const nextRoundIndex = roundIndex + 1;
 
       if (nextRoundIndex >= TOTAL_ROUNDS) {
         // Session Complete
-        const duration = sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 1000) : INITIAL_TIMER_SECONDS;
-        const accuracy = itemsAttempted > 0 ? Math.round((itemsCorrect / itemsAttempted) * 100) : 100;
-        const starsEarned = accuracy >= 90 ? 3 : accuracy >= 70 ? 2 : 1;
-        const xpEarned = score > 0 ? score : itemsCorrect * 10;
-
-        navigation.navigate('VowelMatraMatchSessionComplete', {
-          sessionId: sessionIdRef.current,
-          starsEarned,
-          xpEarned,
-          itemsCorrect,
-          sessionLength: SESSION_TOTAL_PAIRS,
-          accuracy,
-          durationSeconds: duration,
-          sessionResults,
-        });
+        handleSessionEnd();
       } else {
         // Advance to next round
         const round = generateVowelMatraRound(activeDataset, nextRoundIndex);
@@ -219,7 +191,7 @@ export const GameScreen: React.FC = React.memo(() => {
     }, ROUND_CELEBRATION_DURATION_MS);
 
     return () => clearTimeout(timer);
-  }, [matchedVowels.length, roundPairs, roundIndex, sessionStartTime, itemsAttempted, itemsCorrect, score, navigation, advanceRound, activeDataset, sessionResults]);
+  }, [matchedVowels.length, roundPairs, roundIndex, handleSessionEnd, advanceRound, activeDataset, lifecycle]);
 
   // --- Evaluate match between vowel and matra ---
   const evaluateMatch = useCallback(
@@ -248,7 +220,7 @@ export const GameScreen: React.FC = React.memo(() => {
           metadata: { vowel: vowelChar, matra: matraChar },
         }).catch(() => {});
 
-        setTimeout(() => {
+        lifecycle.safeSetTimeout(() => {
           setJustMatchedVowel(null);
           setInteractionLocked(false);
         }, MATCH_CELEBRATION_MS);
@@ -257,7 +229,7 @@ export const GameScreen: React.FC = React.memo(() => {
         triggerHapticWarning();
         setWrongFlashPair({ vowel: vowelChar, matraForm: matraChar });
 
-        setTimeout(() => {
+        lifecycle.safeSetTimeout(() => {
           setWrongFlashPair(null);
           setJustMatchedVowel(vowelChar);
           matchPair(vowelChar);
@@ -272,7 +244,7 @@ export const GameScreen: React.FC = React.memo(() => {
         }, WRONG_FEEDBACK_DURATION_MS);
       }
     },
-    [roundPairs, matchPair, recordAttempt, incrementScore, selectVowel]
+    [roundPairs, matchPair, recordAttempt, incrementScore, selectVowel, lifecycle]
   );
 
   const handleVowelTap = useCallback(
@@ -322,11 +294,9 @@ export const GameScreen: React.FC = React.memo(() => {
   }, []);
 
   const handleConfirmExit = useCallback(() => {
-    stopSpeech();
-    audioManager.stopAllGameAudio();
     setShowExitModal(false);
-    (navigation as any).navigate('GameCatalog');
-  }, [navigation]);
+    lifecycle.exitSession('GameCatalog');
+  }, [lifecycle]);
 
   if (roundPairs.length === 0) {
     return (
@@ -356,7 +326,9 @@ export const GameScreen: React.FC = React.memo(() => {
             score={score}
             roundResults={sessionResults}
             initialSeconds={50}
-            timerDisabled={false}
+            onTimeExpired={handleTimeUp}
+            isPaused={interactionLocked || teachingModalPair !== null || showExitModal || showRoundCelebration}
+            isExited={lifecycle.isExited}
           />
 
           {/* Game Area */}

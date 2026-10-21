@@ -40,6 +40,7 @@ import { speakPhrase, stopSpeech, speakWord } from '../../../services/speechServ
 import { speakPraise } from '../../../services/praiseService';
 import { triggerHapticSuccess, triggerHapticWarning } from '../../../services/hapticsService';
 import { audioManager } from '../../../services/audioManager';
+import { useGameSessionLifecycle } from '../../../hooks';
 import { RootStackParamList } from '../../../types';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Games'>;
@@ -48,6 +49,13 @@ export const GameScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
   const { width: screenWidth } = useWindowDimensions();
+
+  // Unified Session Lifecycle
+  const lifecycle = useGameSessionLifecycle({
+    gameId: 'shape_challenge',
+    screenName: 'ShapeChallengeGame',
+    onQuitModalToggle: (visible) => setShowExitModal(visible),
+  });
 
   const motherTongue = useAppLanguageStore((s) => s.motherTongue) || 'en';
   const learningLanguage = useAppLanguageStore((s) => s.learningLanguage) || 'en';
@@ -109,35 +117,37 @@ export const GameScreen: React.FC = React.memo(() => {
   // Complete session handler
   const handleCompleteSession = useCallback(
     async (finalCorrectCount: number, isTimeExpired = false) => {
-      const durationSeconds = Math.round((Date.now() - sessionStartTime) / 1000);
-      const totalRounds = rounds.length || TOTAL_SHAPE_ROUNDS;
-      const accuracy = Math.round((finalCorrectCount / totalRounds) * 100);
+      lifecycle.completeSession(async () => {
+        const durationSeconds = Math.round((Date.now() - sessionStartTime) / 1000);
+        const totalRounds = rounds.length || TOTAL_SHAPE_ROUNDS;
+        const accuracy = Math.round((finalCorrectCount / totalRounds) * 100);
 
-      const xpResult = await xpService.recordSessionCompletionXP({
-        sessionId,
-        gameId: 'shape_challenge',
-        age: selectedAge,
-        motherTongue,
-        learningLanguage,
-        totalQuestions: totalRounds,
-        correctAnswers: finalCorrectCount,
-        accuracy,
-        durationSeconds,
-      });
-
-      navigation.navigate('Games', {
-        screen: 'ShapeChallengeSessionComplete' as any,
-        params: {
-          starsEarned: xpResult.starsEarned,
-          xpEarned: xpResult.totalSessionXp,
-          itemsCorrect: finalCorrectCount,
-          sessionLength: totalRounds,
+        const xpResult = await xpService.recordSessionCompletionXP({
+          sessionId,
+          gameId: 'shape_challenge',
+          age: selectedAge,
+          motherTongue,
+          learningLanguage,
+          totalQuestions: totalRounds,
+          correctAnswers: finalCorrectCount,
           accuracy,
-          isTimeExpired,
-        },
+          durationSeconds,
+        });
+
+        navigation.navigate('Games', {
+          screen: 'ShapeChallengeSessionComplete' as any,
+          params: {
+            starsEarned: xpResult.starsEarned,
+            xpEarned: xpResult.totalSessionXp,
+            itemsCorrect: finalCorrectCount,
+            sessionLength: totalRounds,
+            accuracy,
+            isTimeExpired,
+          },
+        });
       });
     },
-    [sessionId, selectedAge, motherTongue, learningLanguage, rounds.length, sessionStartTime, navigation]
+    [lifecycle, sessionId, selectedAge, motherTongue, learningLanguage, rounds.length, sessionStartTime, navigation]
   );
 
   const handleTimeExpired = useCallback(() => {
@@ -179,12 +189,12 @@ export const GameScreen: React.FC = React.memo(() => {
 
       // Speak shape pronunciation in learning language + praise
       speakWord(targetWord, learningLanguage);
-      setTimeout(() => {
+      lifecycle.safeSetTimeout(() => {
         speakPraise(learningLanguage);
       }, 500);
 
       // 4. Advance or complete after animation
-      transitionTimeoutRef.current = setTimeout(() => {
+      transitionTimeoutRef.current = lifecycle.safeSetTimeout(() => {
         setShowCelebration(false);
         const newCorrectCount = itemsCorrect + 1;
 
@@ -207,6 +217,7 @@ export const GameScreen: React.FC = React.memo(() => {
       rounds.length,
       nextRound,
       handleCompleteSession,
+      lifecycle,
     ]
   );
 
@@ -273,7 +284,7 @@ export const GameScreen: React.FC = React.memo(() => {
             });
           } catch {}
 
-          transitionTimeoutRef.current = setTimeout(() => {
+          transitionTimeoutRef.current = lifecycle.safeSetTimeout(() => {
             if (roundIndex + 1 < rounds.length) {
               nextRound();
             } else {
@@ -296,6 +307,7 @@ export const GameScreen: React.FC = React.memo(() => {
       nextRound,
       handleCompleteSession,
       itemsCorrect,
+      lifecycle,
     ]
   );
 
@@ -306,10 +318,8 @@ export const GameScreen: React.FC = React.memo(() => {
   }, [currentRound, learningLanguage]);
 
   const handleExitGame = () => {
-    stopSpeech();
-    audioManager.stopAllGameAudio();
     setShowExitModal(false);
-    navigation.navigate('GameCatalog');
+    lifecycle.exitSession('GameCatalog');
   };
 
   const containerWidth = Math.min(screenWidth - 32, 440);
@@ -347,6 +357,7 @@ export const GameScreen: React.FC = React.memo(() => {
             showExitModal ||
             showCorrectionModal
           }
+          isExited={lifecycle.isExited}
           containerWidth={containerWidth}
         />
 

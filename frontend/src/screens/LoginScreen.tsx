@@ -167,7 +167,7 @@ export const LoginScreen: React.FC = () => {
                   <Animated.Text style={[styles.brandStar, animatedSparkleStyle]}>
                     ⭐
                   </Animated.Text>
-                  <Text style={styles.brandTitle}>GYANNN</Text>
+                  <Text style={styles.brandTitle}>GYAN</Text>
                   <Animated.Text style={[styles.brandStar, animatedSparkleStyle]}>
                     ✨
                   </Animated.Text>
@@ -343,7 +343,7 @@ export const LoginScreen: React.FC = () => {
 
                 {/* Secondary Action: Create My Profile */}
                 <View style={styles.signupBlock}>
-                  <Text style={styles.newHereText}>New to Gyannn?</Text>
+                  <Text style={styles.newHereText}>New to Gyan?</Text>
                   <Pressable
                     onPress={() => {
                       if (Platform.OS === 'web' && typeof document !== 'undefined') {

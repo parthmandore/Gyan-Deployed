@@ -19,10 +19,11 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 
 import {
   CartoonBackground,
@@ -55,7 +56,9 @@ import { GAME_REGISTRY } from '../config/gameRegistry';
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'ChildDashboard'>;
 
 export const ChildDashboardScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp>();
+  const insets = useSafeAreaInsets();
 
   const profile = useChildProfileStore();
   const [dashboardData, setDashboardData] = useState<DashboardPayload | null>(null);
@@ -158,7 +161,7 @@ export const ChildDashboardScreen: React.FC = () => {
         <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
         <CartoonBackground theme="hub" />
         <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Opening your learning adventure... 🌟</Text>
+        <Text style={styles.loadingText}>{t('dashboard.openingAdventure')}</Text>
       </View>
     );
   }
@@ -171,7 +174,10 @@ export const ChildDashboardScreen: React.FC = () => {
       <SafeAreaView style={styles.safeArea}>
         <ResponsiveContainer maxWidth="standard" padding="sm">
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: Math.max(60, insets.bottom + 24) },
+            ]}
             showsVerticalScrollIndicator={false}
           >
             {/* 1. HERO HEADER: Personal Greeting, Avatar, Level, XP Capsule Bar & Streak */}
@@ -179,6 +185,8 @@ export const ChildDashboardScreen: React.FC = () => {
               name={profile.name}
               avatar={profile.avatar}
               levelInfo={dashboardData.xp}
+              age={profile.age}
+              language={profile.appLanguage || profile.motherTongue}
               onPressProfile={() => setShowSettingsModal(true)}
               onPressSettings={() => setShowSettingsModal(true)}
             />
@@ -203,7 +211,7 @@ export const ChildDashboardScreen: React.FC = () => {
                   navigation.navigate('GameCatalog');
                 }}
                 style={styles.portalCtaBtn}
-                accessibilityLabel="Explore all 19 games in the catalog"
+                accessibilityLabel="Explore all games in the catalog"
                 accessibilityRole="button"
               >
                 <LinearGradient
@@ -218,10 +226,10 @@ export const ChildDashboardScreen: React.FC = () => {
 
                   <View style={styles.portalTextCol}>
                     <Text style={styles.portalTitle} numberOfLines={1}>
-                      EXPLORE ALL ADVENTURES 🌟
+                      {t('dashboard.exploreAll')}
                     </Text>
                     <Text style={styles.portalSubtitle} numberOfLines={1}>
-                      Discover all 19 fun games & challenges →
+                      {t('dashboard.discoverGames')}
                     </Text>
                   </View>
                 </LinearGradient>

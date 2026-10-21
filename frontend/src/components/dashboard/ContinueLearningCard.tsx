@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IslandPanel } from '../IslandPanel';
 import { PrimaryAdventureButton } from '../PrimaryAdventureButton';
@@ -28,6 +29,8 @@ export const ContinueLearningCard: React.FC<ContinueLearningCardProps> = ({
   recommendation,
   onPlayNow,
 }) => {
+  const { t } = useTranslation();
+
   return (
     <IslandPanel
       variant="twilight"
@@ -44,11 +47,11 @@ export const ContinueLearningCard: React.FC<ContinueLearningCardProps> = ({
         {/* Header Tags */}
         <View style={styles.headerRow}>
           <View style={styles.questTagPill}>
-            <Text style={styles.questTagText}>✨ YOUR NEXT QUEST</Text>
+            <Text style={styles.questTagText}>✨ {t('dashboard.nextQuest')}</Text>
           </View>
 
           <View style={styles.durationPill}>
-            <Text style={styles.durationText}>⏱️ 5 MINS</Text>
+            <Text style={styles.durationText}>⏱️ {t('dashboard.fiveMins')}</Text>
           </View>
         </View>
 
@@ -68,7 +71,7 @@ export const ContinueLearningCard: React.FC<ContinueLearningCardProps> = ({
               {recommendation.title}
             </Text>
             <Text style={styles.promptSubtitle}>
-              Tap to practice and earn bonus XP! ⭐
+              {t('dashboard.tapToPractice')}
             </Text>
           </View>
         </View>
@@ -76,7 +79,7 @@ export const ContinueLearningCard: React.FC<ContinueLearningCardProps> = ({
         {/* Level 3 Tactile CTA Button */}
         <View style={styles.actionRow}>
           <PrimaryAdventureButton
-            label="START QUEST →"
+            label={t('dashboard.startQuest')}
             variant="success"
             size="md"
             onPress={onPlayNow}

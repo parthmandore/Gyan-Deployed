@@ -56,7 +56,10 @@ const setStorageItem = async (key: string, value: string): Promise<void> => {
  * Retrieves initial mother tongue / app language with legacy fallback.
  */
 export const getInitialMotherTongue = async (): Promise<AppLanguage | null> => {
-  let stored = await getStorageItem(MOTHER_TONGUE_STORAGE_KEY);
+  let stored = await getStorageItem('@gyan_app_interface_language');
+  if (!stored) {
+    stored = await getStorageItem(MOTHER_TONGUE_STORAGE_KEY);
+  }
   if (!stored) {
     stored = await getStorageItem(LEGACY_LANGUAGE_STORAGE_KEY);
   }
@@ -87,7 +90,7 @@ export const getInitialLanguage = getInitialMotherTongue;
  */
 export const getInitialAge = async (): Promise<AppAge | null> => {
   const stored = await getStorageItem(AGE_STORAGE_KEY);
-  if (stored && (stored === '5' || stored === '6' || stored === '7')) {
+  if (stored && (stored === '5' || stored === '6' || stored === '7' || stored === '8')) {
     return parseInt(stored, 10) as AppAge;
   }
   return null;
@@ -192,7 +195,10 @@ export const useAppLanguageStore = create<AppLanguageState>((set, get) => ({
       selectedLanguage: lang,
       appLanguage: lang,
     });
-    await setPersistedMotherTongue(lang);
+    await Promise.all([
+      setPersistedMotherTongue(lang),
+      setStorageItem('@gyan_app_interface_language', lang),
+    ]);
 
     const i18nInstance = getI18n();
     if (i18nInstance && typeof i18nInstance.changeLanguage === 'function') {
@@ -208,23 +214,31 @@ export const useAppLanguageStore = create<AppLanguageState>((set, get) => ({
 
   setAppLanguage: async (lang: AppLanguage) => {
     console.log(`[LANGUAGE DEBUG] setAppLanguage: ${lang}`);
-    set({ appLanguage: lang });
-    await setStorageItem('@gyan_app_interface_language', lang);
+    set({
+      appLanguage: lang,
+      motherTongue: lang,
+      selectedLanguage: lang,
+    });
+    await Promise.all([
+      setStorageItem('@gyan_app_interface_language', lang),
+      setPersistedMotherTongue(lang),
+    ]);
     const i18nInstance = getI18n();
     if (i18nInstance && typeof i18nInstance.changeLanguage === 'function') {
       i18nInstance.changeLanguage(lang);
     }
   },
 
-  // Backward-compatible alias: setting selectedLanguage sets motherTongue
+  // Backward-compatible alias: setting selectedLanguage sets motherTongue and appLanguage
   setSelectedLanguage: async (lang: AppLanguage) => {
-    await get().setMotherTongue(lang);
+    await get().setAppLanguage(lang);
   },
 
   setSelectedAge: async (age: AppAge) => {
-    console.log(`[LANGUAGE DEBUG] setSelectedAge: ${age}`);
-    set({ selectedAge: age });
-    await setPersistedAge(age);
+    const validAge: AppAge = (age === 5 || age === 6 || age === 7 || age === 8) ? age : 5;
+    console.log(`[LANGUAGE DEBUG] setSelectedAge: ${validAge}`);
+    set({ selectedAge: validAge });
+    await setPersistedAge(validAge);
   },
 
   setCompleteProfile: async (

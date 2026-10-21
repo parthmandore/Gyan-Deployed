@@ -8,6 +8,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { Typography } from '../theme/typography';
 import { Colors } from '../theme/colors';
 
@@ -16,6 +17,7 @@ export interface SessionCountdownTimerProps {
   onTimeExpired?: () => void;
   onExpire?: () => void;
   isPaused?: boolean;
+  isExited?: boolean;
   onSecondsChange?: (secondsLeft: number) => void;
   style?: ViewStyle;
 }
@@ -28,11 +30,19 @@ export const SessionCountdownTimer: React.FC<SessionCountdownTimerProps> = React
     onTimeExpired,
     onExpire,
     isPaused = false,
+    isExited = false,
     onSecondsChange,
     style,
   }) => {
+    const isFocused = useIsFocused();
     const [secondsLeft, setSecondsLeft] = useState<number>(initialSeconds);
     const hasExpiredRef = useRef<boolean>(false);
+    const isExitedRef = useRef<boolean>(Boolean(isExited));
+    isExitedRef.current = Boolean(isExited);
+
+    const isFocusedRef = useRef<boolean>(isFocused);
+    isFocusedRef.current = isFocused;
+
     const expireHandler = onTimeExpired || onExpire || (() => {});
     const onTimeExpiredRef = useRef(expireHandler);
     onTimeExpiredRef.current = expireHandler;
@@ -40,13 +50,17 @@ export const SessionCountdownTimer: React.FC<SessionCountdownTimerProps> = React
     onSecondsChangeRef.current = onSecondsChange;
 
     useEffect(() => {
-      if (isPaused || hasExpiredRef.current) return;
+      if (isPaused || !isFocused || hasExpiredRef.current || isExited) return;
 
       const timer = setInterval(() => {
         setSecondsLeft((prev) => {
+          if (!isFocusedRef.current || isExitedRef.current) {
+            clearInterval(timer);
+            return prev;
+          }
           if (prev <= 1) {
             clearInterval(timer);
-            if (!hasExpiredRef.current) {
+            if (!hasExpiredRef.current && isFocusedRef.current && !isExitedRef.current) {
               hasExpiredRef.current = true;
               onTimeExpiredRef.current();
             }
@@ -60,7 +74,7 @@ export const SessionCountdownTimer: React.FC<SessionCountdownTimerProps> = React
       }, 1000);
 
       return () => clearInterval(timer);
-    }, [isPaused]);
+    }, [isPaused, isFocused, isExited]);
 
     // Format mm:ss
     const minutes = Math.floor(secondsLeft / 60);

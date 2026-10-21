@@ -29,6 +29,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 
 import {
   ResponsiveContainer,
@@ -45,7 +46,7 @@ import {
   WorldSpacing,
   WorldTypography,
 } from '../theme/tokens';
-import { AppLanguage, LearningLanguage, AppAge } from '../state/appLanguageStore';
+import { AppLanguage, AppAge } from '../state/appLanguageStore';
 import { AVATAR_OPTIONS } from '../state/childProfileStore';
 import { useAuthStore } from '../state/authStore';
 import { localDatabase } from '../services/localDatabase';
@@ -66,15 +67,10 @@ const APP_LANGUAGES: LanguageOption[] = [
   { code: 'mr', name: 'मराठी', flag: '🚩' },
 ];
 
-const LEARNING_LANGUAGES: { code: LearningLanguage; name: string; flag: string }[] = [
-  { code: 'en', name: 'English', flag: '🔤' },
-  { code: 'hi', name: 'हिंदी', flag: '🇮🇳' },
-  { code: 'mr', name: 'मराठी', flag: '🚩' },
-];
-
 const AGES: AppAge[] = [5, 6, 7, 8];
 
 export const SignUpProfileScreen: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const navigation = useNavigation<NavigationProp>();
   const { width: screenWidth } = useWindowDimensions();
 
@@ -87,7 +83,6 @@ export const SignUpProfileScreen: React.FC = () => {
   const [pin, setPin] = useState('');
   const [selectedAge, setSelectedAge] = useState<AppAge>(5);
   const [selectedAppLanguage, setSelectedAppLanguage] = useState<AppLanguage>('en');
-  const [selectedLearningLanguage, setSelectedLearningLanguage] = useState<LearningLanguage>('hi');
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -118,7 +113,6 @@ export const SignUpProfileScreen: React.FC = () => {
       pinLength: cleanPin.length,
       age: selectedAge,
       appLanguage: selectedAppLanguage,
-      learningLanguage: selectedLearningLanguage,
     });
 
     // 1. Validate Name
@@ -181,7 +175,7 @@ export const SignUpProfileScreen: React.FC = () => {
         age: selectedAge,
         avatar: selectedAvatar,
         appLanguage: selectedAppLanguage,
-        learningLanguage: selectedLearningLanguage,
+        learningLanguage: selectedAppLanguage,
         motherTongue: selectedAppLanguage,
       });
 
@@ -213,6 +207,12 @@ export const SignUpProfileScreen: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSelectLanguage = (langCode: AppLanguage) => {
+    audioManager.playTapSound();
+    setSelectedAppLanguage(langCode);
+    i18n.changeLanguage(langCode);
   };
 
   return (
@@ -250,7 +250,7 @@ export const SignUpProfileScreen: React.FC = () => {
                   accessibilityRole="button"
                   accessibilityLabel="Go back to Login"
                 >
-                  <Text style={styles.backButtonText}>← Back to Login</Text>
+                  <Text style={styles.backButtonText}>{t('onboarding.backToLogin')}</Text>
                 </Pressable>
               </View>
 
@@ -264,9 +264,9 @@ export const SignUpProfileScreen: React.FC = () => {
                     animated
                   />
                   <View style={styles.headerTextCol}>
-                    <Text style={styles.headerTitle}>Create Your World ✨</Text>
+                    <Text style={styles.headerTitle}>{t('onboarding.createWorld')}</Text>
                     <Text style={styles.headerSubtitle}>
-                      Let's set up your personal learning adventure playground!
+                      {t('onboarding.createWorldSubtitle')}
                     </Text>
                   </View>
                 </View>
@@ -282,9 +282,9 @@ export const SignUpProfileScreen: React.FC = () => {
               {/* SECTION 1: Choose Your Buddy */}
               <IslandPanel variant="sunshine" elevation="floating" style={styles.sectionIsland}>
                 <SectionHeader
-                  title="Choose Your Buddy"
+                  title={t('onboarding.chooseBuddy')}
                   icon="🐾"
-                  subtitle="Pick your learning companion!"
+                  subtitle={t('onboarding.chooseBuddySubtitle')}
                 />
                 <View style={styles.avatarGrid}>
                   {AVATAR_OPTIONS.map((item) => {
@@ -322,9 +322,9 @@ export const SignUpProfileScreen: React.FC = () => {
               {/* SECTION 2: Name */}
               <IslandPanel variant="frosted" elevation="floating" style={styles.sectionIsland}>
                 <SectionHeader
-                  title="What's your name?"
+                  title={t('onboarding.whatsYourName')}
                   icon="✍️"
-                  subtitle="We will call you by this name"
+                  subtitle={t('onboarding.nameSubtitle')}
                 />
                 <TextInput
                   style={[styles.textInput, nameError ? styles.textInputError : null]}
@@ -347,9 +347,9 @@ export const SignUpProfileScreen: React.FC = () => {
               {/* SECTION 3: Username */}
               <IslandPanel variant="frosted" elevation="floating" style={styles.sectionIsland}>
                 <SectionHeader
-                  title="Create your username"
+                  title={t('onboarding.createUsername')}
                   icon="🏷️"
-                  subtitle="For signing in on any device"
+                  subtitle={t('onboarding.usernameSubtitle')}
                 />
                 <TextInput
                   style={[styles.textInput, usernameError ? styles.textInputError : null]}
@@ -373,9 +373,9 @@ export const SignUpProfileScreen: React.FC = () => {
               {/* SECTION 4: 4-Digit PIN */}
               <IslandPanel variant="parchment" elevation="floating" style={styles.sectionIsland}>
                 <SectionHeader
-                  title="Create your 4-digit PIN"
+                  title={t('onboarding.createPin')}
                   icon="🔢"
-                  subtitle="Keep it secret and easy to remember"
+                  subtitle={t('onboarding.pinSubtitle')}
                 />
                 <TextInput
                   style={[
@@ -403,9 +403,9 @@ export const SignUpProfileScreen: React.FC = () => {
               {/* SECTION 5: How Old Are You? (2x2 Grid) */}
               <IslandPanel variant="emerald" elevation="floating" style={styles.sectionIsland}>
                 <SectionHeader
-                  title="How old are you?"
+                  title={t('onboarding.howOldAreYou')}
                   icon="🎂"
-                  subtitle="Games adjust automatically to your age"
+                  subtitle={t('onboarding.ageSubtitle')}
                 />
                 <View style={styles.ageGrid}>
                   {AGES.map((age) => {
@@ -418,7 +418,7 @@ export const SignUpProfileScreen: React.FC = () => {
                           setSelectedAge(age);
                         }}
                         style={[styles.ageCard, isSelected && styles.ageCardSelected]}
-                        accessibilityLabel={`Age ${age} Years`}
+                        accessibilityLabel={`Age ${age} ${t('onboarding.years')}`}
                         accessibilityRole="button"
                       >
                         <Text
@@ -435,7 +435,7 @@ export const SignUpProfileScreen: React.FC = () => {
                             isSelected && styles.ageLabelSelected,
                           ]}
                         >
-                          Years
+                          {t('onboarding.years')}
                         </Text>
                       </BigTouchTarget>
                     );
@@ -443,12 +443,12 @@ export const SignUpProfileScreen: React.FC = () => {
                 </View>
               </IslandPanel>
 
-              {/* SECTION 6: App Language */}
+              {/* SECTION 6: Choose Your Language */}
               <IslandPanel variant="frosted" elevation="floating" style={styles.sectionIsland}>
                 <SectionHeader
-                  title="App Language"
+                  title={t('onboarding.chooseLanguage')}
                   icon="🌐"
-                  subtitle="Language used for instructions and menus"
+                  subtitle={t('onboarding.languageSubtitle')}
                 />
                 <View style={styles.languageOptionsList}>
                   {APP_LANGUAGES.map((lang) => {
@@ -456,55 +456,12 @@ export const SignUpProfileScreen: React.FC = () => {
                     return (
                       <BigTouchTarget
                         key={lang.code}
-                        onPress={() => {
-                          audioManager.playTapSound();
-                          setSelectedAppLanguage(lang.code);
-                        }}
+                        onPress={() => handleSelectLanguage(lang.code)}
                         style={[
                           styles.languagePill,
                           isSelected && styles.languagePillSelected,
                         ]}
-                        accessibilityLabel={`App Language: ${lang.name}`}
-                        accessibilityRole="button"
-                      >
-                        <Text style={styles.langFlag}>{lang.flag}</Text>
-                        <Text
-                          style={[
-                            styles.langText,
-                            isSelected && styles.langTextSelected,
-                          ]}
-                        >
-                          {lang.name}
-                        </Text>
-                        {isSelected && <Text style={styles.checkIcon}>✓</Text>}
-                      </BigTouchTarget>
-                    );
-                  })}
-                </View>
-              </IslandPanel>
-
-              {/* SECTION 7: Learning Language */}
-              <IslandPanel variant="frosted" elevation="floating" style={styles.sectionIsland}>
-                <SectionHeader
-                  title="What do you want to learn?"
-                  icon="🎯"
-                  subtitle="Target language for speech and vocabulary games"
-                />
-                <View style={styles.languageOptionsList}>
-                  {LEARNING_LANGUAGES.map((lang) => {
-                    const isSelected = selectedLearningLanguage === lang.code;
-                    return (
-                      <BigTouchTarget
-                        key={lang.code}
-                        onPress={() => {
-                          audioManager.playTapSound();
-                          setSelectedLearningLanguage(lang.code);
-                        }}
-                        style={[
-                          styles.languagePill,
-                          isSelected && styles.languagePillSelected,
-                        ]}
-                        accessibilityLabel={`Learning Language: ${lang.name}`}
+                        accessibilityLabel={`Language: ${lang.name}`}
                         accessibilityRole="button"
                       >
                         <Text style={styles.langFlag}>{lang.flag}</Text>
@@ -535,8 +492,8 @@ export const SignUpProfileScreen: React.FC = () => {
                 <PrimaryAdventureButton
                   label={
                     isSubmitting
-                      ? 'CREATING YOUR WORLD... 🌟'
-                      : 'START MY ADVENTURE 🚀'
+                      ? t('onboarding.creatingWorld')
+                      : t('onboarding.startAdventure')
                   }
                   variant="success"
                   size="lg"
@@ -548,7 +505,7 @@ export const SignUpProfileScreen: React.FC = () => {
 
               {/* Footer: Already have an account? LOGIN */}
               <View style={styles.loginFooter}>
-                <Text style={styles.alreadyText}>Already have an account?</Text>
+                <Text style={styles.alreadyText}>{t('onboarding.alreadyAccount')}</Text>
                 <Pressable
                   onPress={() => {
                     audioManager.playTapSound();
@@ -558,7 +515,7 @@ export const SignUpProfileScreen: React.FC = () => {
                   accessibilityRole="button"
                   accessibilityLabel="Go to Login screen"
                 >
-                  <Text style={styles.loginLinkText}>LOGIN 🚀</Text>
+                  <Text style={styles.loginLinkText}>{t('onboarding.login')}</Text>
                 </Pressable>
               </View>
             </ScrollView>

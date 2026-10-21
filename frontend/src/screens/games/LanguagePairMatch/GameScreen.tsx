@@ -51,6 +51,7 @@ import { speakPhrase, stopSpeech } from '../../../services/speechService';
 import { audioManager } from '../../../services/audioManager';
 import { speakPraise } from '../../../services/praiseService';
 import { xpService } from '../../../services/xpService';
+import { useGameSessionLifecycle } from '../../../hooks';
 
 const INITIAL_TIMER_SECONDS = 90;
 const MATCH_CELEBRATION_MS = 500;
@@ -70,6 +71,13 @@ export const GameScreen: React.FC = React.memo(() => {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<RouteProp<LanguagePairMatchStackParamList, 'LanguagePairMatchGame'>>();
   const { width: screenWidth } = useWindowDimensions();
+
+  // Unified Session Lifecycle
+  const lifecycle = useGameSessionLifecycle({
+    gameId: 'language_pair_match',
+    screenName: 'LanguagePairMatchGame',
+    onQuitModalToggle: (visible) => setShowExitModal(visible),
+  });
 
   // Language state resolution: route params first, then store
   const isInitialized = useAppLanguageStore((s) => s.isInitialized);
@@ -118,10 +126,6 @@ export const GameScreen: React.FC = React.memo(() => {
 
   // 10-Star Session Progress Trail (1 star per pair matched, persists across all 3 rounds)
   const [sessionResults, setSessionResults] = useState<Array<'correct' | 'wrong'>>([]);
-
-  // 50-Second continuous global countdown timer
-  const [timeLeft, setTimeLeft] = useState<number>(INITIAL_TIMER_SECONDS);
-  const timeExpiredRef = useRef(false);
 
   // Drag Gesture & Layout state
   const [isScreenReaderActive, setIsScreenReaderActive] = useState(false);
@@ -223,53 +227,55 @@ export const GameScreen: React.FC = React.memo(() => {
     speakPhrase(promptText, { language: motherTongue });
   }, [motherTongue, t]);
 
-  // Session completion handler
+  // Session completion handler guarded by lifecycle
   const handleSessionEnd = useCallback(async () => {
-    isGameActiveRef.current = false;
-    clearAllTimers();
-    stopSpeech();
+    lifecycle.completeSession(async () => {
+      isGameActiveRef.current = false;
+      clearAllTimers();
 
-    // Read synchronous, latest state from store to prevent stale closure counts
-    const storeState = useLanguagePairMatchStore.getState();
-    const finalItemsCorrect = storeState.itemsCorrect;
-    const finalItemsAttempted = storeState.itemsAttempted;
-    const finalScore = storeState.score;
-    const finalRoundAttempts = storeState.roundAttempts;
+      // Read synchronous, latest state from store to prevent stale closure counts
+      const storeState = useLanguagePairMatchStore.getState();
+      const finalItemsCorrect = storeState.itemsCorrect;
+      const finalItemsAttempted = storeState.itemsAttempted;
+      const finalScore = storeState.score;
+      const finalRoundAttempts = storeState.roundAttempts;
 
-    const durationSec = sessionStartTime
-      ? Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000))
-      : INITIAL_TIMER_SECONDS;
+      const durationSec = sessionStartTime
+        ? Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000))
+        : INITIAL_TIMER_SECONDS;
 
-    const accuracy =
-      finalItemsAttempted > 0 ? Math.round((finalItemsCorrect / finalItemsAttempted) * 100) : 100;
-    const starsEarned = accuracy >= 90 ? 3 : accuracy >= 70 ? 2 : 1;
+      const accuracy =
+        finalItemsAttempted > 0 ? Math.round((finalItemsCorrect / finalItemsAttempted) * 100) : 100;
+      const starsEarned = accuracy >= 90 ? 3 : accuracy >= 70 ? 2 : 1;
 
-    // Record session completion to centralized XP engine
-    const sessionResult = await xpService.recordSessionCompletionXP({
-      sessionId: sessionIdRef.current,
-      gameId: 'language_pair_match',
-      category: 'vocabulary',
-      learningLanguage,
-      motherTongue,
-      age: selectedAge,
-      totalQuestions: TOTAL_SESSION_PAIRS, // exactly 10 pairs
-      correctAnswers: finalItemsCorrect,
-      accuracy,
-      durationSeconds: durationSec,
-      roundXpEarned: finalScore,
-    });
+      // Record session completion to centralized XP engine
+      const sessionResult = await xpService.recordSessionCompletionXP({
+        sessionId: sessionIdRef.current,
+        gameId: 'language_pair_match',
+        category: 'vocabulary',
+        learningLanguage,
+        motherTongue,
+        age: selectedAge,
+        totalQuestions: TOTAL_SESSION_PAIRS, // exactly 10 pairs
+        correctAnswers: finalItemsCorrect,
+        accuracy,
+        durationSeconds: durationSec,
+        roundXpEarned: finalScore,
+      });
 
-    navigation.navigate('LanguagePairMatchSessionComplete', {
-      sessionId: sessionIdRef.current,
-      starsEarned: sessionResult.starsEarned || starsEarned,
-      xpEarned: sessionResult.totalSessionXp || (finalScore > 0 ? finalScore : finalItemsCorrect * 10),
-      itemsCorrect: finalItemsCorrect,
-      sessionLength: TOTAL_SESSION_PAIRS, // exactly 10 pairs
-      accuracy,
-      durationSeconds: durationSec,
-      roundAttempts: finalRoundAttempts,
+      navigation.navigate('LanguagePairMatchSessionComplete', {
+        sessionId: sessionIdRef.current,
+        starsEarned: sessionResult.starsEarned || starsEarned,
+        xpEarned: sessionResult.totalSessionXp || (finalScore > 0 ? finalScore : finalItemsCorrect * 10),
+        itemsCorrect: finalItemsCorrect,
+        sessionLength: TOTAL_SESSION_PAIRS, // exactly 10 pairs
+        accuracy,
+        durationSeconds: durationSec,
+        roundAttempts: finalRoundAttempts,
+      });
     });
   }, [
+    lifecycle,
     sessionStartTime,
     learningLanguage,
     motherTongue,
@@ -283,37 +289,11 @@ export const GameScreen: React.FC = React.memo(() => {
     handleSessionEndRef.current = handleSessionEnd;
   }, [handleSessionEnd]);
 
-  // Time expired handler for 50s countdown
+  // Time expired handler from GameHUD countdown timer
   const handleTimeUp = useCallback(() => {
     setInteractionLocked(true);
     handleSessionEnd();
   }, [handleSessionEnd]);
-
-  // Continuous 50-second countdown timer across all rounds
-  useEffect(() => {
-    if (interactionLocked || showExitModal || showReportModal || !currentRound) return;
-
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          timeExpiredRef.current = true;
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [interactionLocked, showExitModal, showReportModal, currentRound]);
-
-  // Handle time expiry in clean effect
-  useEffect(() => {
-    if (timeLeft === 0 && timeExpiredRef.current) {
-      timeExpiredRef.current = false;
-      handleTimeUp();
-    }
-  }, [timeLeft, handleTimeUp]);
 
   // Initialize first round on mount
   useEffect(() => {
@@ -396,7 +376,7 @@ export const GameScreen: React.FC = React.memo(() => {
         // Dual-language audio feedback: source word -> target word
         speakDualLanguageMatch(sourceCard.text, targetCard.text);
 
-        setTimeout(() => {
+        lifecycle.safeSetTimeout(() => {
           setJustMatchedConceptId(null);
         }, MATCH_CELEBRATION_MS);
 
@@ -405,13 +385,11 @@ export const GameScreen: React.FC = React.memo(() => {
         if (newMatchedCount >= currentRound.pairCount) {
           setInteractionLocked(true);
 
-          advanceTimerRef.current = setTimeout(() => {
-            if (!isGameActiveRef.current) return;
+          advanceTimerRef.current = lifecycle.safeSetTimeout(() => {
             setShowRoundCelebration(true);
             speakPraise(motherTongue);
 
-            advanceTimerRef.current = setTimeout(() => {
-              if (!isGameActiveRef.current) return;
+            advanceTimerRef.current = lifecycle.safeSetTimeout(() => {
               setShowRoundCelebration(false);
               const nextRoundIndex = roundIndex + 1;
 
@@ -437,8 +415,7 @@ export const GameScreen: React.FC = React.memo(() => {
         speakPhrase(t('languagePairMatch.tryAgain', 'Try another match!'), { language: motherTongue });
 
         if (wrongTimerRef.current) clearTimeout(wrongTimerRef.current);
-        wrongTimerRef.current = setTimeout(() => {
-          if (!isGameActiveRef.current) return;
+        wrongTimerRef.current = lifecycle.safeSetTimeout(() => {
           clearWrongFlash();
           clearSelection();
         }, WRONG_FEEDBACK_MS);
@@ -458,6 +435,7 @@ export const GameScreen: React.FC = React.memo(() => {
       clearSelection,
       nextRound,
       handleSessionEnd,
+      lifecycle,
       speakDualLanguageMatch,
       t,
     ]
@@ -687,12 +665,8 @@ export const GameScreen: React.FC = React.memo(() => {
 
   // Quit confirmation
   const handleConfirmQuit = () => {
-    isGameActiveRef.current = false;
-    clearAllTimers();
-    stopSpeech();
-    audioManager.stopAllGameAudio();
     setShowExitModal(false);
-    (navigation as any).navigate('GameCatalog');
+    lifecycle.exitSession('GameCatalog');
   };
 
   const containerWidth = Math.min(screenWidth - 24, 440);
@@ -779,6 +753,7 @@ export const GameScreen: React.FC = React.memo(() => {
             initialSeconds={INITIAL_TIMER_SECONDS}
             onTimeExpired={handleTimeUp}
             isPaused={interactionLocked || showExitModal || showReportModal || !currentRound || showRoundCelebration}
+            isExited={lifecycle.isExited}
             containerWidth={containerWidth}
           />
 

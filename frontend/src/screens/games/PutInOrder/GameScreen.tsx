@@ -44,6 +44,7 @@ import {
   triggerHapticLightImpact,
 } from '../../../services/hapticsService';
 import { xpService } from '../../../services/xpService';
+import { useGameSessionLifecycle } from '../../../hooks';
 import { OrderItem, OrderQuestion, SupportedLanguage } from './types';
 import { RootStackParamList } from '../../../types';
 
@@ -53,6 +54,13 @@ export const GameScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
   const { width: screenWidth } = useWindowDimensions();
+
+  // Unified Session Lifecycle
+  const lifecycle = useGameSessionLifecycle({
+    gameId: 'put_in_order',
+    screenName: 'PutInOrderGame',
+    onQuitModalToggle: (visible) => setShowQuitModal(visible),
+  });
 
   const motherTongue = (useAppLanguageStore((s) => s.motherTongue) || 'en') as SupportedLanguage;
   const learningLanguage = (useAppLanguageStore((s) => s.learningLanguage) || 'en') as SupportedLanguage;
@@ -129,7 +137,7 @@ export const GameScreen: React.FC = React.memo(() => {
     setCorrectionWrong('');
     roundStartTimeRef.current = Date.now();
 
-    const speechTimeout = setTimeout(() => {
+    const speechTimeout = lifecycle.safeSetTimeout(() => {
       speakCurrentPrompt();
     }, 450);
 
@@ -137,53 +145,53 @@ export const GameScreen: React.FC = React.memo(() => {
       clearTimeout(speechTimeout);
       stopSpeech();
     };
-  }, [roundIndex, currentRound, speakCurrentPrompt]);
+  }, [roundIndex, currentRound, speakCurrentPrompt, lifecycle]);
 
   const finishSession = useCallback(
     async (finalCorrect: number, isTimeExpired = false) => {
-      if (isSessionFinishedRef.current) return;
-      isSessionFinishedRef.current = true;
-      isNavigatingAwayRef.current = true;
-      setIsRoundLocked(true);
-      stopSpeech();
+      lifecycle.completeSession(async () => {
+        isNavigatingAwayRef.current = true;
+        setIsRoundLocked(true);
+        stopSpeech();
 
-      const durationSeconds = Math.max(
-        1,
-        Math.round((Date.now() - sessionStartTime) / 1000)
-      );
+        const durationSeconds = Math.max(
+          1,
+          Math.round((Date.now() - sessionStartTime) / 1000)
+        );
 
-      let earnedXp = 0;
-      try {
-        const accuracy = Math.round((finalCorrect / TOTAL_ORDER_ROUNDS) * 100);
-        const xpResult = await xpService.recordSessionCompletionXP({
-          sessionId,
-          gameId: 'put_in_order',
-          age: selectedAge,
-          motherTongue,
-          learningLanguage,
-          totalQuestions: TOTAL_ORDER_ROUNDS,
-          correctAnswers: finalCorrect,
-          accuracy,
-          durationSeconds,
+        let earnedXp = 0;
+        try {
+          const accuracy = Math.round((finalCorrect / TOTAL_ORDER_ROUNDS) * 100);
+          const xpResult = await xpService.recordSessionCompletionXP({
+            sessionId,
+            gameId: 'put_in_order',
+            age: selectedAge,
+            motherTongue,
+            learningLanguage,
+            totalQuestions: TOTAL_ORDER_ROUNDS,
+            correctAnswers: finalCorrect,
+            accuracy,
+            durationSeconds,
+          });
+          earnedXp = xpResult?.totalSessionXp || finalCorrect * 15;
+        } catch {
+          earnedXp = finalCorrect * 15;
+        }
+
+        navigation.navigate('Games', {
+          screen: 'PutInOrderSessionComplete' as any,
+          params: {
+            score: finalCorrect * 10,
+            totalQuestions: TOTAL_ORDER_ROUNDS,
+            correctAnswers: finalCorrect,
+            xpEarned: earnedXp,
+            durationSeconds,
+            isTimeExpired,
+          },
         });
-        earnedXp = xpResult?.totalSessionXp || finalCorrect * 15;
-      } catch {
-        earnedXp = finalCorrect * 15;
-      }
-
-      navigation.navigate('Games', {
-        screen: 'PutInOrderSessionComplete' as any,
-        params: {
-          score: finalCorrect * 10,
-          totalQuestions: TOTAL_ORDER_ROUNDS,
-          correctAnswers: finalCorrect,
-          xpEarned: earnedXp,
-          durationSeconds,
-          isTimeExpired,
-        },
       });
     },
-    [sessionId, selectedAge, motherTongue, learningLanguage, sessionStartTime, navigation]
+    [lifecycle, sessionId, selectedAge, motherTongue, learningLanguage, sessionStartTime, navigation]
   );
 
   const handleTimeExpired = useCallback(() => {
@@ -250,7 +258,7 @@ export const GameScreen: React.FC = React.memo(() => {
           const newCorrect = itemsCorrect + 1;
 
           // Transition to next round or finish session
-          transitionTimerRef.current = setTimeout(async () => {
+          transitionTimerRef.current = lifecycle.safeSetTimeout(async () => {
             setShowCelebration(false);
 
             if (roundIndex + 1 >= TOTAL_ORDER_ROUNDS) {
@@ -298,7 +306,7 @@ export const GameScreen: React.FC = React.memo(() => {
               // Ignore
             }
 
-            transitionTimerRef.current = setTimeout(() => {
+            transitionTimerRef.current = lifecycle.safeSetTimeout(() => {
               if (roundIndex + 1 >= TOTAL_ORDER_ROUNDS) {
                 finishSession(itemsCorrect);
               } else {
@@ -322,6 +330,7 @@ export const GameScreen: React.FC = React.memo(() => {
       nextRound,
       finishSession,
       sessionId,
+      lifecycle,
     ]
   );
 
@@ -362,14 +371,8 @@ export const GameScreen: React.FC = React.memo(() => {
   }, [navigation]);
 
   const handleConfirmQuit = () => {
-    isNavigatingAwayRef.current = true;
     setShowQuitModal(false);
-    if (transitionTimerRef.current) {
-      clearTimeout(transitionTimerRef.current);
-    }
-    stopSpeech();
-    audioManager.stopAllGameAudio();
-    navigation.navigate('GameCatalog');
+    lifecycle.exitSession('GameCatalog');
   };
 
   const handleCancelQuit = () => {
@@ -410,6 +413,7 @@ export const GameScreen: React.FC = React.memo(() => {
           initialSeconds={90}
           onTimeExpired={handleTimeExpired}
           isPaused={showCorrectionModal || showCelebration || showQuitModal}
+          isExited={lifecycle.isExited}
           roundResults={roundResults}
           containerWidth={contentMaxWidth}
         />

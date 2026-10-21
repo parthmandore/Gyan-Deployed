@@ -12,7 +12,7 @@
  * Folder: frontend/src/screens
  */
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -20,8 +20,9 @@ import {
   StatusBar,
   ScrollView,
   useWindowDimensions,
+  BackHandler,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -59,13 +60,6 @@ const LANGUAGE_LABELS: Record<string, string> = {
   mr: 'मराठी',
 };
 
-const AGES: readonly { age: AppAge; label: string; icon: string }[] = [
-  { age: 5, label: 'Age 5', icon: '🐣' },
-  { age: 6, label: 'Age 6', icon: '🚀' },
-  { age: 7, label: 'Age 7', icon: '⭐' },
-  { age: 8, label: 'Age 8', icon: '🏆' },
-];
-
 const ALL_REALMS: readonly LearningRealm[] = [
   'letters_phonics',
   'reading_words',
@@ -79,13 +73,13 @@ const ALL_REALMS: readonly LearningRealm[] = [
 export const GameCatalogScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp>();
+  const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
 
   const motherTongue = useAppLanguageStore((s) => s.motherTongue) || 'en';
   const learningLanguage = useAppLanguageStore((s) => s.learningLanguage) || 'en';
   const selectedLanguage = useAppLanguageStore((s) => s.selectedLanguage) || motherTongue;
   const selectedAge = (useAppLanguageStore((s) => s.selectedAge) || 5) as AppAge;
-  const setSelectedAge = useAppLanguageStore((s) => s.setSelectedAge);
   const setSelectedLanguage = useAppLanguageStore((s) => s.setSelectedLanguage);
 
   const history = useProgressStore((s) => s.history) || [];
@@ -173,23 +167,30 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
     }, 800);
   };
 
-  // Handle return to dashboard with debounce
-  const handleGoBack = () => {
+  // Safe Back behavior with stack check and fallback to dashboard
+  const handleGoBack = useCallback(() => {
     if (isNavigatingRef.current) return;
     isNavigatingRef.current = true;
     audioManager.playTapSound();
-    navigation.navigate('ChildDashboard');
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('ChildDashboard');
+    }
     setTimeout(() => {
       isNavigatingRef.current = false;
     }, 800);
-  };
+  }, [navigation]);
 
-  // Quick in-place age switch
-  const handleSelectAge = (age: AppAge) => {
-    if (age === selectedAge) return;
-    audioManager.playTapSound();
-    setSelectedAge(age);
-  };
+  // Android hardware Back handler consistent with visible button
+  useEffect(() => {
+    const onBackPress = () => {
+      handleGoBack();
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [handleGoBack]);
 
   // Quick in-place language cycle
   const handleToggleLanguage = () => {
@@ -252,7 +253,7 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
                     {t('games.catalogTitle')}
                   </Text>
                   <Text style={styles.headerSubtitleText} numberOfLines={1}>
-                    {availableGames.length} Quests • {realmGroups.length} Active Realms
+                    Age {selectedAge} • {availableGames.length} Quests • {realmGroups.length} Active Realms
                   </Text>
                 </View>
               </View>
@@ -267,37 +268,6 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
                 >
                   <Text style={styles.languageSwitchText}>🌐 {currentLangLabel}</Text>
                 </BigTouchTarget>
-              </View>
-            </View>
-
-            {/* Row 2: In-Place Age Selector Bar */}
-            <View style={styles.ageSelectorContainer}>
-              <Text style={styles.ageSelectorLabel}>🎂 {t('ageGate.title', 'Age')}:</Text>
-              <View style={styles.agePillsRow}>
-                {AGES.map((item) => {
-                  const isSelected = item.age === selectedAge;
-                  return (
-                    <BigTouchTarget
-                      key={item.age}
-                      onPress={() => handleSelectAge(item.age)}
-                      accessibilityLabel={`Select Age ${item.age}`}
-                      accessibilityRole="button"
-                      style={[
-                        styles.agePill,
-                        isSelected && styles.agePillActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.agePillText,
-                          isSelected && styles.agePillTextActive,
-                        ]}
-                      >
-                        {item.icon} {item.age}
-                      </Text>
-                    </BigTouchTarget>
-                  );
-                })}
               </View>
             </View>
           </IslandPanel>
@@ -370,7 +340,10 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
           {/* Main Content: Connected Realm Destinations */}
           <ScrollView
             style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: Math.max(60, insets.bottom + 24) },
+            ]}
             showsVerticalScrollIndicator={false}
           >
             {displayedRealms.length > 0 ? (

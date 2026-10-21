@@ -13,7 +13,10 @@ import {
   Modal,
   ScrollView,
   TextInput,
+  Alert,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BigTouchTarget } from '../BigTouchTarget';
 import { Typography } from '../../theme/typography';
 import { AppLanguage, LearningLanguage, AppAge } from '../../state/appLanguageStore';
@@ -42,15 +45,16 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   onSaved,
   onLogout,
 }) => {
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const profile = useChildProfileStore();
   const logout = useAuthStore((s) => s.logout);
 
   const [name, setName] = useState(profile.name);
   const [avatar, setAvatar] = useState(profile.avatar);
   const [age, setAge] = useState<AppAge>(profile.age);
-  const [motherTongue, setMotherTongue] = useState<AppLanguage>(profile.motherTongue);
-  const [learningLanguage, setLearningLanguage] = useState<LearningLanguage>(profile.learningLanguage);
-  const [appLanguage, setAppLanguage] = useState<AppLanguage>(profile.appLanguage || profile.motherTongue);
+  const [appLanguage, setAppLanguage] = useState<AppLanguage>(profile.appLanguage || profile.motherTongue || 'en');
+  const [learningLanguage, setLearningLanguage] = useState<LearningLanguage>(profile.learningLanguage || 'en');
 
   const [musicEnabled, setMusicEnabled] = useState(audioManager.getMusicEnabled());
   const [sfxEnabled, setSfxEnabled] = useState(true);
@@ -65,11 +69,12 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       name: name.trim() || profile.name,
       age,
       avatar,
-      motherTongue,
+      motherTongue: appLanguage,
       learningLanguage,
       appLanguage,
     });
     if (onSaved) onSaved();
+    Alert.alert('Gyan', t('settings.savedSuccess'));
     onClose();
   };
 
@@ -83,10 +88,10 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
+        <View style={[styles.modalCard, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
           {/* Header */}
           <View style={styles.headerRow}>
-            <Text style={styles.headerTitle}>Profile & Settings ⚙️</Text>
+            <Text style={styles.headerTitle}>{t('settings.title')}</Text>
             <BigTouchTarget
               onPress={onClose}
               style={styles.closeBtn}
@@ -100,19 +105,19 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
           <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
             {/* Child Name */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Child Name</Text>
+              <Text style={styles.sectionLabel}>{t('settings.childName')}</Text>
               <TextInput
                 style={styles.nameInput}
                 value={name}
                 onChangeText={setName}
-                placeholder="Name"
+                placeholder={t('settings.childName')}
                 maxLength={20}
               />
             </View>
 
             {/* Avatar Selector */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Learning Buddy Avatar</Text>
+              <Text style={styles.sectionLabel}>{t('settings.learningBuddyAvatar')}</Text>
               <View style={styles.avatarRow}>
                 {AVATAR_OPTIONS.map((item) => {
                   const isSel = avatar === item.emoji;
@@ -136,7 +141,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
 
             {/* Age Selector (2x2 Grid) */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Age Level (Games Curriculum)</Text>
+              <Text style={styles.sectionLabel}>{t('settings.ageLevel')}</Text>
               <View style={styles.ageRow}>
                 {AGES.map((a) => {
                   const isSel = age === a;
@@ -148,65 +153,11 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
                         setAge(a);
                       }}
                       style={[styles.ageOpt, isSel && styles.ageOptSelected]}
-                      accessibilityLabel={`Age ${a}`}
+                      accessibilityLabel={`${t('settings.age')} ${a}`}
                       accessibilityRole="button"
                     >
                       <Text style={[styles.ageText, isSel && styles.ageTextSelected]}>
-                        Age {a}
-                      </Text>
-                    </BigTouchTarget>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Mother Tongue */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Mother Tongue (App Interface & Voice)</Text>
-              <View style={styles.langRow}>
-                {LANGUAGES.map((l) => {
-                  const isSel = motherTongue === l.code;
-                  return (
-                    <BigTouchTarget
-                      key={`mt_${l.code}`}
-                      onPress={() => {
-                        audioManager.playTapSound();
-                        setMotherTongue(l.code as AppLanguage);
-                      }}
-                      style={[styles.langOpt, isSel && styles.langOptSelected]}
-                      accessibilityLabel={l.name}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.langFlag}>{l.flag}</Text>
-                      <Text style={[styles.langText, isSel && styles.langTextSelected]}>
-                        {l.name}
-                      </Text>
-                    </BigTouchTarget>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Learning Language */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Learning Language (Words & Speech)</Text>
-              <View style={styles.langRow}>
-                {LANGUAGES.map((l) => {
-                  const isSel = learningLanguage === l.code;
-                  return (
-                    <BigTouchTarget
-                      key={`ll_${l.code}`}
-                      onPress={() => {
-                        audioManager.playTapSound();
-                        setLearningLanguage(l.code as LearningLanguage);
-                      }}
-                      style={[styles.langOpt, isSel && styles.langOptSelected]}
-                      accessibilityLabel={l.name}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.langFlag}>{l.flag}</Text>
-                      <Text style={[styles.langText, isSel && styles.langTextSelected]}>
-                        {l.name}
+                        {t('settings.age')} {a}
                       </Text>
                     </BigTouchTarget>
                   );
@@ -216,7 +167,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
 
             {/* App Interface Language */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>App Interface Language (Buttons & Labels)</Text>
+              <Text style={styles.sectionLabel}>{t('settings.appLanguage')}</Text>
               <View style={styles.langRow}>
                 {LANGUAGES.map((l) => {
                   const isSel = appLanguage === l.code;
@@ -241,9 +192,36 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
               </View>
             </View>
 
+            {/* Learning Language */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>{t('settings.learningLanguage')}</Text>
+              <View style={styles.langRow}>
+                {LANGUAGES.map((l) => {
+                  const isSel = learningLanguage === l.code;
+                  return (
+                    <BigTouchTarget
+                      key={`ll_${l.code}`}
+                      onPress={() => {
+                        audioManager.playTapSound();
+                        setLearningLanguage(l.code as LearningLanguage);
+                      }}
+                      style={[styles.langOpt, isSel && styles.langOptSelected]}
+                      accessibilityLabel={l.name}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.langFlag}>{l.flag}</Text>
+                      <Text style={[styles.langText, isSel && styles.langTextSelected]}>
+                        {l.name}
+                      </Text>
+                    </BigTouchTarget>
+                  );
+                })}
+              </View>
+            </View>
+
             {/* Sound & Music Toggles */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Sound & Music 🎵</Text>
+              <Text style={styles.sectionLabel}>{t('settings.soundAndMusic')}</Text>
               <View style={styles.audioToggleRow}>
                 <BigTouchTarget
                   onPress={() => {
@@ -255,7 +233,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
                   accessibilityRole="button"
                 >
                   <Text style={styles.audioToggleText}>
-                    {musicEnabled ? '🎶 Music: ON' : '🔇 Music: OFF'}
+                    {musicEnabled ? t('settings.musicOn') : t('settings.musicOff')}
                   </Text>
                 </BigTouchTarget>
 
@@ -269,7 +247,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
                   accessibilityRole="button"
                 >
                   <Text style={styles.audioToggleText}>
-                    {sfxEnabled ? '🔊 Sound: ON' : '🔇 Sound: OFF'}
+                    {sfxEnabled ? t('settings.sfxOn') : t('settings.sfxOff')}
                   </Text>
                 </BigTouchTarget>
               </View>
@@ -284,7 +262,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
               accessibilityLabel="Save profile changes"
               accessibilityRole="button"
             >
-              <Text style={styles.saveBtnText}>Save Preferences ✓</Text>
+              <Text style={styles.saveBtnText}>{t('settings.savePreferences')}</Text>
             </BigTouchTarget>
 
             <BigTouchTarget
@@ -293,7 +271,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
               accessibilityLabel="Log out of account"
               accessibilityRole="button"
             >
-              <Text style={styles.logoutBtnText}>Log Out 🚪</Text>
+              <Text style={styles.logoutBtnText}>{t('settings.logOut')}</Text>
             </BigTouchTarget>
           </View>
         </View>
@@ -342,6 +320,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   modalScroll: {
+    flexShrink: 1,
     marginBottom: 16,
   },
   section: {

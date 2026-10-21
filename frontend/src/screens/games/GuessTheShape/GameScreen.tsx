@@ -42,6 +42,7 @@ import { audioManager } from '../../../services/audioManager';
 import { speakPraise } from '../../../services/praiseService';
 import { triggerHapticSuccess, triggerHapticWarning } from '../../../services/hapticsService';
 import { RootStackParamList } from '../../../types';
+import { useGameSessionLifecycle } from '../../../hooks';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Games'>;
 
@@ -79,37 +80,20 @@ export const GameScreen: React.FC = React.memo(() => {
   const [sessionId] = useState(() => `gts_${Date.now()}`);
 
   const transitionTimeoutRef = useRef<any>(null);
-  const isMountedRef = useRef(true);
+
+  const lifecycle = useGameSessionLifecycle({
+    gameId: 'guess_the_shape',
+    sessionId,
+    onQuitModalToggle: setShowExitModal,
+    onCleanup: resetGame,
+    defaultExitDestination: 'GameCatalog',
+  });
 
   // Initialize session questions on mount
   useEffect(() => {
-    isMountedRef.current = true;
     const generatedRounds = generateGuessShapeQuestions(selectedAge, learningLanguage);
     startSession(generatedRounds);
-
-    const unsubscribeBeforeRemove = navigation.addListener('beforeRemove', () => {
-      isMountedRef.current = false;
-      stopSpeech();
-      audioManager.stopAllGameAudio();
-    });
-
-    const unsubscribeBlur = navigation.addListener('blur', () => {
-      isMountedRef.current = false;
-      stopSpeech();
-      audioManager.stopAllGameAudio();
-    });
-
-    return () => {
-      isMountedRef.current = false;
-      unsubscribeBeforeRemove();
-      unsubscribeBlur();
-      stopSpeech();
-      audioManager.stopAllGameAudio();
-      if (transitionTimeoutRef.current) {
-        clearTimeout(transitionTimeoutRef.current);
-      }
-    };
-  }, [selectedAge, learningLanguage, startSession, navigation]);
+  }, [selectedAge, learningLanguage, startSession]);
 
   const currentRound: ShapeQuestion | undefined = rounds[roundIndex];
 
@@ -131,50 +115,48 @@ export const GameScreen: React.FC = React.memo(() => {
   // Complete session handler
   const handleCompleteSession = useCallback(
     async (finalCorrectCount: number, isTimeExpired = false) => {
-      if (transitionTimeoutRef.current) {
-        clearTimeout(transitionTimeoutRef.current);
-      }
-      stopSpeech();
+      lifecycle.completeSession(async () => {
+        const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
+        const totalRounds = rounds.length || TOTAL_GUESS_SHAPE_ROUNDS;
+        const accuracy = Math.round((finalCorrectCount / totalRounds) * 100);
 
-      const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
-      const totalRounds = rounds.length || TOTAL_GUESS_SHAPE_ROUNDS;
-      const accuracy = Math.round((finalCorrectCount / totalRounds) * 100);
+        let starsEarned = 1;
+        let xpEarned = 50;
 
-      let starsEarned = 1;
-      let xpEarned = 50;
+        try {
+          const xpResult = await xpService.recordSessionCompletionXP({
+            sessionId,
+            gameId: 'guess_the_shape',
+            age: selectedAge,
+            motherTongue,
+            learningLanguage,
+            totalQuestions: totalRounds,
+            correctAnswers: finalCorrectCount,
+            accuracy,
+            durationSeconds,
+          });
+          starsEarned = xpResult.starsEarned;
+          xpEarned = xpResult.totalSessionXp;
+        } catch {
+          starsEarned = finalCorrectCount >= 8 ? 3 : finalCorrectCount >= 5 ? 2 : 1;
+          xpEarned = starsEarned * 15;
+        }
 
-      try {
-        const xpResult = await xpService.recordSessionCompletionXP({
-          sessionId,
-          gameId: 'guess_the_shape',
-          age: selectedAge,
-          motherTongue,
-          learningLanguage,
-          totalQuestions: totalRounds,
-          correctAnswers: finalCorrectCount,
-          accuracy,
-          durationSeconds,
+        navigation.navigate('Games', {
+          screen: 'GuessTheShapeSessionComplete' as any,
+          params: {
+            starsEarned,
+            xpEarned,
+            itemsCorrect: finalCorrectCount,
+            sessionLength: totalRounds,
+            accuracy,
+            isTimeExpired,
+          },
         });
-        starsEarned = xpResult.starsEarned;
-        xpEarned = xpResult.totalSessionXp;
-      } catch {
-        starsEarned = finalCorrectCount >= 8 ? 3 : finalCorrectCount >= 5 ? 2 : 1;
-        xpEarned = starsEarned * 15;
-      }
-
-      navigation.navigate('Games', {
-        screen: 'GuessTheShapeSessionComplete' as any,
-        params: {
-          starsEarned,
-          xpEarned,
-          itemsCorrect: finalCorrectCount,
-          sessionLength: totalRounds,
-          accuracy,
-          isTimeExpired,
-        },
       });
     },
     [
+      lifecycle,
       sessionId,
       selectedAge,
       motherTongue,
@@ -187,8 +169,9 @@ export const GameScreen: React.FC = React.memo(() => {
 
   // 90s Countdown Timer expiration
   const handleTimeExpired = useCallback(() => {
+    if (lifecycle.statusRef.current !== 'active') return;
     handleCompleteSession(itemsCorrect, true);
-  }, [handleCompleteSession, itemsCorrect]);
+  }, [lifecycle, handleCompleteSession, itemsCorrect]);
 
   // Handle option selection
   const handleOptionPress = useCallback(
@@ -235,8 +218,7 @@ export const GameScreen: React.FC = React.memo(() => {
         }, 600);
 
         // Advance
-        transitionTimeoutRef.current = setTimeout(() => {
-          if (!isMountedRef.current) return;
+        transitionTimeoutRef.current = lifecycle.safeSetTimeout(() => {
           setShowCelebration(false);
           const newCorrectCount = itemsCorrect + 1;
 
@@ -307,8 +289,7 @@ export const GameScreen: React.FC = React.memo(() => {
             });
           } catch {}
 
-          transitionTimeoutRef.current = setTimeout(() => {
-            if (!isMountedRef.current) return;
+          transitionTimeoutRef.current = lifecycle.safeSetTimeout(() => {
             if (roundIndex + 1 < rounds.length) {
               nextRound();
             } else {
@@ -331,6 +312,7 @@ export const GameScreen: React.FC = React.memo(() => {
       rounds.length,
       nextRound,
       handleCompleteSession,
+      lifecycle,
     ]
   );
 
@@ -343,13 +325,8 @@ export const GameScreen: React.FC = React.memo(() => {
 
   // Exit handling: navigate back to GameCatalog
   const handleExitGame = () => {
-    stopSpeech();
-    audioManager.stopAllGameAudio();
     setShowExitModal(false);
-    if (transitionTimeoutRef.current) {
-      clearTimeout(transitionTimeoutRef.current);
-    }
-    navigation.navigate('GameCatalog');
+    lifecycle.exitSession('GameCatalog');
   };
 
   const containerWidth = Math.min(screenWidth - 32, 440);
@@ -389,6 +366,7 @@ export const GameScreen: React.FC = React.memo(() => {
             showExitModal ||
             showCorrectionModal
           }
+          isExited={lifecycle.isExited}
           containerWidth={containerWidth}
         />
 

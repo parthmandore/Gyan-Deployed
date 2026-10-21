@@ -82,6 +82,15 @@ class LanguageManagerService {
    * Syncs i18next language locale to match selected learning language.
    */
   private syncI18n(): void {
+    try {
+      const { useAppLanguageStore } = require('../state/appLanguageStore');
+      const appLang = useAppLanguageStore.getState().appLanguage;
+      if (appLang && i18n && typeof i18n.changeLanguage === 'function') {
+        i18n.changeLanguage(appLang);
+        return;
+      }
+    } catch {}
+
     const meta = SUPPORTED_LANGUAGES[this.currentLanguage];
     if (meta && i18n && typeof i18n.changeLanguage === 'function') {
       i18n.changeLanguage(meta.code);

@@ -8,6 +8,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, AccessibilityInfo } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -31,22 +32,34 @@ interface ChildHeaderProps {
   name: string;
   avatar: string;
   levelInfo: LevelInfo;
+  age?: number;
+  language?: string;
   onPressProfile?: () => void;
   onPressSettings?: () => void;
 }
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: 'English',
+  hi: 'हिन्दी',
+  mr: 'मराठी',
+};
 
 export const ChildHeader: React.FC<ChildHeaderProps> = ({
   name,
   avatar,
   levelInfo,
+  age = 5,
+  language = 'en',
   onPressProfile,
   onPressSettings,
 }) => {
+  const { t } = useTranslation();
   const currentLevel = levelInfo.level || 1;
   const streak = levelInfo.streak_days || 0;
   const xpInLevel = levelInfo.xp_in_level || 0;
   const levelCost = levelInfo.current_level_cost || 100;
   const progressPercent = Math.min(100, Math.max(5, levelInfo.progress_percent || 0));
+  const langLabel = LANGUAGE_LABELS[language] || 'English';
 
   const animatedProgress = useSharedValue(progressPercent);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -78,6 +91,8 @@ export const ChildHeader: React.FC<ChildHeaderProps> = ({
     };
   });
 
+  const isLongName = (name || '').trim().length > 12;
+
   return (
     <IslandPanel variant="frosted" elevation="floating" style={styles.islandContainer} padding="md">
       {/* Top Row: Avatar + Greeting + Settings Button */}
@@ -97,11 +112,15 @@ export const ChildHeader: React.FC<ChildHeaderProps> = ({
 
         {/* Greeting with Safe Name Constraints */}
         <View style={styles.greetingBlock}>
-          <Text style={styles.greetingSubtitle}>Welcome back,</Text>
+          <Text style={styles.greetingSubtitle} numberOfLines={1}>
+            {t('dashboard.welcomeBack')}
+          </Text>
           <Text
-            style={styles.greetingName}
-            numberOfLines={1}
-            ellipsizeMode="tail"
+            style={[
+              styles.greetingName,
+              isLongName && styles.greetingNameLong,
+            ]}
+            numberOfLines={2}
           >
             {name || 'Explorer'}! 👋
           </Text>
@@ -125,16 +144,24 @@ export const ChildHeader: React.FC<ChildHeaderProps> = ({
         )}
       </View>
 
-      {/* Level & XP Capsule Bar (Integrated, NOT a nested card) */}
+      {/* Level, Age, Language & XP Capsule Bar */}
       <View style={styles.progressSection}>
         <View style={styles.badgesRow}>
           <View style={styles.levelPill}>
-            <Text style={styles.levelPillText}>⭐ LEVEL {currentLevel}</Text>
+            <Text style={styles.levelPillText}>⭐ {t('dashboard.level')} {currentLevel}</Text>
+          </View>
+
+          <View style={styles.agePill}>
+            <Text style={styles.agePillText}>🎂 {t('settings.age')} {age}</Text>
+          </View>
+
+          <View style={styles.langPill}>
+            <Text style={styles.langPillText}>🌐 {langLabel}</Text>
           </View>
 
           <View style={styles.streakPill}>
             <Text style={styles.streakPillText}>
-              🔥 {streak} {streak === 1 ? 'DAY' : 'DAYS'}
+              🔥 {streak} {streak === 1 ? t('dashboard.day', 'DAY') : t('dashboard.days')}
             </Text>
           </View>
 
@@ -194,6 +221,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: WorldPalettes.text.primary,
     letterSpacing: 0.2,
+    lineHeight: 24,
+  },
+  greetingNameLong: {
+    fontSize: 16,
+    lineHeight: 20,
   },
   audioPill: {
     marginRight: 6,
@@ -229,7 +261,7 @@ const styles = StyleSheet.create({
   },
   levelPill: {
     backgroundColor: '#FEF3C7',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: WorldRadii.pill,
     borderWidth: 1.5,
@@ -240,6 +272,36 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#92400E',
+    letterSpacing: 0.5,
+  },
+  agePill: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: WorldRadii.pill,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+  },
+  agePillText: {
+    fontFamily: WorldTypography.fonts.bold,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#B45309',
+    letterSpacing: 0.5,
+  },
+  langPill: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: WorldRadii.pill,
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+  },
+  langPillText: {
+    fontFamily: WorldTypography.fonts.bold,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1D4ED8',
     letterSpacing: 0.5,
   },
   streakPill: {

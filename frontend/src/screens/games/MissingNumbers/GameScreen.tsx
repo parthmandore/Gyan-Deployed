@@ -44,6 +44,7 @@ import {
   triggerHapticWarning,
 } from '../../../services/hapticsService';
 import { xpService } from '../../../services/xpService';
+import { useGameSessionLifecycle } from '../../../hooks';
 import { MissingNumbersOption, MissingNumbersRound } from './types';
 import { RootStackParamList } from '../../../types';
 
@@ -53,6 +54,13 @@ export const GameScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
   const { width: screenWidth } = useWindowDimensions();
+
+  // Unified Session Lifecycle
+  const lifecycle = useGameSessionLifecycle({
+    gameId: 'missing_numbers',
+    screenName: 'MissingNumbersGame',
+    onQuitModalToggle: (visible) => setShowExitModal(visible),
+  });
 
   const motherTongue = useAppLanguageStore((s) => s.motherTongue) || 'en';
   const learningLanguage = useAppLanguageStore((s) => s.learningLanguage) || 'en';
@@ -128,44 +136,44 @@ export const GameScreen: React.FC = React.memo(() => {
 
   const finishSession = useCallback(
     async (finalCorrectCount: number, isTimeExpired = false) => {
-      if (isSessionFinishedRef.current) return;
-      isSessionFinishedRef.current = true;
-      setIsRoundLocked(true);
-      stopSpeech();
+      lifecycle.completeSession(async () => {
+        setIsRoundLocked(true);
+        stopSpeech();
 
-      const durationSeconds = Math.max(
-        1,
-        Math.round((Date.now() - sessionStartTime) / 1000)
-      );
-      const accuracy = Math.round(
-        (finalCorrectCount / TOTAL_MISSING_NUMBERS_ROUNDS) * 100
-      );
+        const durationSeconds = Math.max(
+          1,
+          Math.round((Date.now() - sessionStartTime) / 1000)
+        );
+        const accuracy = Math.round(
+          (finalCorrectCount / TOTAL_MISSING_NUMBERS_ROUNDS) * 100
+        );
 
-      const xpResult = await xpService.recordSessionCompletionXP({
-        sessionId,
-        gameId: 'missing_numbers',
-        age: selectedAge,
-        motherTongue,
-        learningLanguage,
-        totalQuestions: TOTAL_MISSING_NUMBERS_ROUNDS,
-        correctAnswers: finalCorrectCount,
-        accuracy,
-        durationSeconds,
-      });
-
-      navigation.navigate('Games', {
-        screen: 'MissingNumbersSessionComplete' as any,
-        params: {
-          starsEarned: xpResult.starsEarned,
-          xpEarned: xpResult.totalSessionXp,
-          itemsCorrect: finalCorrectCount,
-          sessionLength: TOTAL_MISSING_NUMBERS_ROUNDS,
+        const xpResult = await xpService.recordSessionCompletionXP({
+          sessionId,
+          gameId: 'missing_numbers',
+          age: selectedAge,
+          motherTongue,
+          learningLanguage,
+          totalQuestions: TOTAL_MISSING_NUMBERS_ROUNDS,
+          correctAnswers: finalCorrectCount,
           accuracy,
-          isTimeExpired,
-        },
+          durationSeconds,
+        });
+
+        navigation.navigate('Games', {
+          screen: 'MissingNumbersSessionComplete' as any,
+          params: {
+            starsEarned: xpResult.starsEarned,
+            xpEarned: xpResult.totalSessionXp,
+            itemsCorrect: finalCorrectCount,
+            sessionLength: TOTAL_MISSING_NUMBERS_ROUNDS,
+            accuracy,
+            isTimeExpired,
+          },
+        });
       });
     },
-    [sessionId, selectedAge, motherTongue, learningLanguage, sessionStartTime, navigation]
+    [lifecycle, sessionId, selectedAge, motherTongue, learningLanguage, sessionStartTime, navigation]
   );
 
   const handleTimeExpired = useCallback(() => {
@@ -219,7 +227,7 @@ export const GameScreen: React.FC = React.memo(() => {
 
         const newCorrectCount = itemsCorrect + 1;
 
-        transitionTimeoutRef.current = setTimeout(async () => {
+        transitionTimeoutRef.current = lifecycle.safeSetTimeout(async () => {
           setShowCelebration(false);
 
           if (roundIndex + 1 < rounds.length) {
@@ -268,7 +276,7 @@ export const GameScreen: React.FC = React.memo(() => {
             },
           });
 
-          transitionTimeoutRef.current = setTimeout(async () => {
+          transitionTimeoutRef.current = lifecycle.safeSetTimeout(async () => {
             if (roundIndex + 1 < rounds.length) {
               nextRound();
             } else {
@@ -291,15 +299,13 @@ export const GameScreen: React.FC = React.memo(() => {
       recordAttempt,
       t,
       finishSession,
+      lifecycle,
     ]
   );
 
   const handleQuitGame = () => {
-    stopSpeech();
-    audioManager.stopAllGameAudio();
-    if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current);
     setShowExitModal(false);
-    navigation.navigate('GameCatalog');
+    lifecycle.exitSession('GameCatalog');
   };
 
   if (!currentRound) {
@@ -334,6 +340,7 @@ export const GameScreen: React.FC = React.memo(() => {
           initialSeconds={90}
           onTimeExpired={handleTimeExpired}
           isPaused={showCorrectionModal || showCelebration || showExitModal}
+          isExited={lifecycle.isExited}
           roundResults={roundResults}
           containerWidth={containerWidth}
         />

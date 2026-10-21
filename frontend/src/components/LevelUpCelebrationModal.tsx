@@ -52,7 +52,7 @@ const LEVEL_TITLES: Record<number, { title: string; perk: string; icon: string }
     icon: '🛡️',
   },
   5: {
-    title: 'Gyannn Grand Champion',
+    title: 'Gyan Grand Champion',
     perk: 'Achieved mastery status across the Living Learning World!',
     icon: '🏆',
   },

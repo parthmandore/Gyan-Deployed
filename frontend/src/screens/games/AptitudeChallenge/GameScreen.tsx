@@ -46,6 +46,7 @@ import { speakPraise } from '../../../services/praiseService';
 import { triggerHapticSuccess, triggerHapticWarning } from '../../../services/hapticsService';
 import { audioManager } from '../../../services/audioManager';
 import { RootStackParamList } from '../../../types';
+import { useGameSessionLifecycle } from '../../../hooks';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Games'>;
 type RouteProps = RouteProp<AptitudeChallengeStackParamList, 'AptitudeChallengeGame'>;
@@ -90,22 +91,19 @@ export const GameScreen: React.FC = React.memo(() => {
 
   const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const lifecycle = useGameSessionLifecycle({
+    gameId: `aptitude_${gameType}`,
+    sessionId,
+    onQuitModalToggle: setShowExitModal,
+    onCleanup: resetSession,
+    defaultExitDestination: 'GameCatalog',
+  });
+
   // Initialize session rounds
   useEffect(() => {
     const newRounds = generateAptitudeSession(gameType);
     startSession(gameType, newRounds);
-
-    const unsubscribe = navigation.addListener('beforeRemove', () => {
-      stopSpeech();
-      if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current);
-    });
-
-    return () => {
-      stopSpeech();
-      if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current);
-      unsubscribe();
-    };
-  }, [gameType, startSession, navigation]);
+  }, [gameType, startSession]);
 
   const currentRound: AptitudeRound | undefined = rounds[roundIndex];
 
@@ -129,48 +127,51 @@ export const GameScreen: React.FC = React.memo(() => {
 
   const finishSession = useCallback(
     async (finalCorrectCount: number, isTimeExpired = false) => {
-      const durationSeconds = Math.max(
-        1,
-        Math.round((Date.now() - sessionStartTime) / 1000)
-      );
-      const accuracy = Math.round((finalCorrectCount / TOTAL_APTITUDE_ROUNDS) * 100);
+      lifecycle.completeSession(async () => {
+        const durationSeconds = Math.max(
+          1,
+          Math.round((Date.now() - sessionStartTime) / 1000)
+        );
+        const accuracy = Math.round((finalCorrectCount / TOTAL_APTITUDE_ROUNDS) * 100);
 
-      let starsEarned = 1;
-      let xpEarned = 25;
+        let starsEarned = 1;
+        let xpEarned = 25;
 
-      try {
-        const res = await xpService.recordSessionCompletionXP({
-          sessionId,
-          gameId: gameType,
-          age: selectedAge,
-          motherTongue,
-          learningLanguage,
-          totalQuestions: TOTAL_APTITUDE_ROUNDS,
-          correctAnswers: finalCorrectCount,
-          accuracy,
-          durationSeconds,
+        try {
+          const res = await xpService.recordSessionCompletionXP({
+            sessionId,
+            gameId: gameType,
+            age: selectedAge,
+            motherTongue,
+            learningLanguage,
+            totalQuestions: TOTAL_APTITUDE_ROUNDS,
+            correctAnswers: finalCorrectCount,
+            accuracy,
+            durationSeconds,
+          });
+          starsEarned = res.starsEarned;
+          xpEarned = res.totalSessionXp;
+        } catch {
+          starsEarned = finalCorrectCount >= 8 ? 3 : finalCorrectCount >= 5 ? 2 : 1;
+          xpEarned = starsEarned * 15;
+        }
+
+        navigation.navigate('Games', {
+          screen: 'AptitudeChallengeSessionComplete' as any,
+          params: {
+            gameType,
+            starsEarned,
+            xpEarned,
+            itemsCorrect: finalCorrectCount,
+            sessionLength: TOTAL_APTITUDE_ROUNDS,
+            accuracy,
+            isTimeExpired,
+          },
         });
-        starsEarned = res.starsEarned;
-        xpEarned = res.totalSessionXp;
-      } catch {
-        starsEarned = finalCorrectCount >= 8 ? 3 : finalCorrectCount >= 5 ? 2 : 1;
-        xpEarned = starsEarned * 15;
-      }
-
-      navigation.navigate('Games', {
-        screen: 'AptitudeChallengeSessionComplete' as any,
-        params: {
-          gameType,
-          starsEarned,
-          xpEarned,
-          itemsCorrect: finalCorrectCount,
-          sessionLength: TOTAL_APTITUDE_ROUNDS,
-          accuracy,
-          isTimeExpired,
-        },
       });
     },
     [
+      lifecycle,
       sessionId,
       gameType,
       selectedAge,
@@ -182,8 +183,9 @@ export const GameScreen: React.FC = React.memo(() => {
   );
 
   const handleTimeExpired = useCallback(() => {
+    if (lifecycle.statusRef.current !== 'active') return;
     finishSession(itemsCorrect, true);
-  }, [finishSession, itemsCorrect]);
+  }, [lifecycle, finishSession, itemsCorrect]);
 
   // Handle option selection
   const handleSelectOption = useCallback(
@@ -247,7 +249,7 @@ export const GameScreen: React.FC = React.memo(() => {
         const newCorrectCount = itemsCorrect + 1;
 
         // Transition to next round or completion
-        transitionTimeoutRef.current = setTimeout(() => {
+        transitionTimeoutRef.current = lifecycle.safeSetTimeout(() => {
           setShowCelebration(false);
 
           if (roundIndex + 1 >= TOTAL_APTITUDE_ROUNDS) {
@@ -318,7 +320,7 @@ export const GameScreen: React.FC = React.memo(() => {
             // Graceful fallback
           }
 
-          transitionTimeoutRef.current = setTimeout(() => {
+          transitionTimeoutRef.current = lifecycle.safeSetTimeout(() => {
             if (roundIndex + 1 >= TOTAL_APTITUDE_ROUNDS) {
               finishSession(itemsCorrect);
             } else {
@@ -341,6 +343,7 @@ export const GameScreen: React.FC = React.memo(() => {
       itemsCorrect,
       nextRound,
       finishSession,
+      lifecycle,
     ]
   );
 
@@ -355,9 +358,7 @@ export const GameScreen: React.FC = React.memo(() => {
 
   const handleConfirmExit = () => {
     setShowExitModal(false);
-    stopSpeech();
-    audioManager.stopAllGameAudio();
-    navigation.navigate('GameCatalog');
+    lifecycle.exitSession('GameCatalog');
   };
 
   if (!currentRound) {
@@ -403,6 +404,7 @@ export const GameScreen: React.FC = React.memo(() => {
             showExitModal ||
             showCorrectionModal
           }
+          isExited={lifecycle.isExited}
           containerWidth={contentWidth}
         />
 

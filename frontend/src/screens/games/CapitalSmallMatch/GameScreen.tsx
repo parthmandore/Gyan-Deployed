@@ -49,6 +49,7 @@ import {
 import { stopSpeech } from '../../../services/speechService';
 import { audioManager } from '../../../services/audioManager';
 import { xpService } from '../../../services/xpService';
+import { useGameSessionLifecycle } from '../../../hooks';
 
 type NavProp = NativeStackNavigationProp<CapitalSmallMatchStackParamList>;
 
@@ -180,46 +181,39 @@ export const GameScreen: React.FC = React.memo(() => {
     }
   }, [roundPairs.length, setRound, sessionStartTime, setSessionStartTime]);
 
-  // --- 50-Second Countdown Session Timer ---
+  const lifecycle = useGameSessionLifecycle({
+    gameId: 'capital_small_match',
+    sessionId: sessionIdRef.current,
+    onQuitModalToggle: setShowExitModal,
+    defaultExitDestination: 'GameCatalog',
+  });
+
+  // --- 50-Second Countdown Session Completion ---
   const handleTimeUp = useCallback(() => {
-    setInteractionLocked(true);
-    const duration = sessionStartTime
-      ? Math.round((Date.now() - sessionStartTime) / 1000)
-      : INITIAL_TIMER_SECONDS;
-    const accuracy = itemsAttempted > 0
-      ? Math.round((itemsCorrect / itemsAttempted) * 100)
-      : 100;
-    const starsEarned = accuracy >= 90 ? 3 : accuracy >= 70 ? 2 : 1;
-    const xpEarned = score > 0 ? score : (itemsCorrect * 10);
+    if (lifecycle.statusRef.current !== 'active') return;
+    lifecycle.completeSession(async () => {
+      setInteractionLocked(true);
+      const duration = sessionStartTime
+        ? Math.round((Date.now() - sessionStartTime) / 1000)
+        : INITIAL_TIMER_SECONDS;
+      const accuracy = itemsAttempted > 0
+        ? Math.round((itemsCorrect / itemsAttempted) * 100)
+        : 100;
+      const starsEarned = accuracy >= 90 ? 3 : accuracy >= 70 ? 2 : 1;
+      const xpEarned = score > 0 ? score : (itemsCorrect * 10);
 
-    navigation.navigate('CapitalSmallMatchSessionComplete', {
-      sessionId: sessionIdRef.current,
-      starsEarned,
-      xpEarned,
-      itemsCorrect,
-      sessionLength: SESSION_TOTAL_PAIRS,
-      accuracy,
-      durationSeconds: duration,
-      sessionResults,
-    });
-  }, [sessionStartTime, itemsAttempted, itemsCorrect, score, navigation, sessionResults]);
-
-  useEffect(() => {
-    if (roundPairs.length === 0 || interactionLocked || teachingModalPair !== null) return;
-
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          handleTimeUp();
-          return 0;
-        }
-        return prev - 1;
+      navigation.navigate('CapitalSmallMatchSessionComplete', {
+        sessionId: sessionIdRef.current,
+        starsEarned,
+        xpEarned,
+        itemsCorrect,
+        sessionLength: SESSION_TOTAL_PAIRS,
+        accuracy,
+        durationSeconds: duration,
+        sessionResults,
       });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [roundPairs.length, interactionLocked, teachingModalPair, handleTimeUp]);
+    });
+  }, [lifecycle, sessionStartTime, itemsAttempted, itemsCorrect, score, navigation, sessionResults]);
 
   // --- Detect round completion & trigger celebration overlay & audio ---
   useEffect(() => {
@@ -232,32 +226,14 @@ export const GameScreen: React.FC = React.memo(() => {
     setShowRoundCelebration(true);
     playRoundCompleteAudio();
 
-    const timer = setTimeout(() => {
+    const timer = lifecycle.safeSetTimeout(() => {
       setShowRoundCelebration(false);
       const nextRoundIndex = roundIndex + 1;
       const TOTAL_SESSION_ROUNDS = 3;
 
       if (nextRoundIndex >= TOTAL_SESSION_ROUNDS) {
         // Session complete navigation after 3 full rounds (12 total pairs)
-        const duration = sessionStartTime
-          ? Math.round((Date.now() - sessionStartTime) / 1000)
-          : INITIAL_TIMER_SECONDS;
-        const accuracy = itemsAttempted > 0
-          ? Math.round((itemsCorrect / itemsAttempted) * 100)
-          : 100;
-        const starsEarned = accuracy >= 90 ? 3 : accuracy >= 70 ? 2 : 1;
-        const xpEarned = score > 0 ? score : (itemsCorrect * 10);
-
-        navigation.navigate('CapitalSmallMatchSessionComplete', {
-          sessionId: sessionIdRef.current,
-          starsEarned,
-          xpEarned,
-          itemsCorrect,
-          sessionLength: SESSION_TOTAL_PAIRS,
-          accuracy,
-          durationSeconds: duration,
-          sessionResults,
-        });
+        handleTimeUp();
       } else {
         // Advance to next round atomically
         previousRoundPairsRef.current = roundPairs.map((p) => p.capital);
@@ -526,10 +502,8 @@ export const GameScreen: React.FC = React.memo(() => {
 
   const handleConfirmExit = useCallback(() => {
     setShowExitModal(false);
-    stopSpeech();
-    audioManager.stopAllGameAudio();
-    navigation.navigate('GameCatalog' as any);
-  }, [navigation]);
+    lifecycle.exitSession('GameCatalog');
+  }, [lifecycle]);
 
   if (roundPairs.length === 0) {
     return (
@@ -559,7 +533,10 @@ export const GameScreen: React.FC = React.memo(() => {
             totalRounds={SESSION_TOTAL_PAIRS}
             score={score}
             roundResults={sessionResults}
-            initialSeconds={50}
+            initialSeconds={INITIAL_TIMER_SECONDS}
+            onTimeExpired={handleTimeUp}
+            isPaused={interactionLocked || teachingModalPair !== null || showExitModal || showRoundCelebration}
+            isExited={lifecycle.isExited}
             timerDisabled={false}
           />
 

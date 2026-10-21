@@ -64,3 +64,8 @@ Desktop.ini
 .vscode/
 *.swp
 *.swo
+
+# Backups & Migration artifacts
+.phase*_backup/
+*.backup/
+*.bak
