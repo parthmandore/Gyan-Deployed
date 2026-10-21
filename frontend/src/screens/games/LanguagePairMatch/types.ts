@@ -96,5 +96,7 @@ export type LanguagePairMatchStackParamList = {
     accuracy: number;
     durationSeconds: number;
     roundAttempts?: PairMatchAttempt[];
-  } | undefined;
+    isAbandoned?: boolean;
+  itemsAttempted?: number;
+} | undefined;
 };

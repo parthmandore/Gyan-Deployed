@@ -21,6 +21,28 @@ class LanguageManagerService {
     if (this.isLoaded) return this.currentLanguage;
 
     try {
+      // Check Zustand appLanguageStore first
+      try {
+        const { useAppLanguageStore } = require('../state/appLanguageStore');
+        const storeLang = useAppLanguageStore.getState().learningLanguage;
+        if (storeLang === 'hi' || storeLang === 'hindi') {
+          this.currentLanguage = 'hindi';
+          this.isLoaded = true;
+          this.syncI18n();
+          return this.currentLanguage;
+        } else if (storeLang === 'mr' || storeLang === 'marathi') {
+          this.currentLanguage = 'marathi';
+          this.isLoaded = true;
+          this.syncI18n();
+          return this.currentLanguage;
+        } else if (storeLang === 'en' || storeLang === 'english') {
+          this.currentLanguage = 'english';
+          this.isLoaded = true;
+          this.syncI18n();
+          return this.currentLanguage;
+        }
+      } catch {}
+
       let stored: string | null = null;
       if (typeof window !== 'undefined' && window.localStorage) {
         stored = window.localStorage.getItem(STORAGE_KEY);
@@ -33,8 +55,12 @@ class LanguageManagerService {
         }
       }
 
-      if (stored && (stored === 'english' || stored === 'hindi' || stored === 'marathi')) {
-        this.currentLanguage = stored as LearningLanguage;
+      if (stored === 'hindi' || stored === 'hi') {
+        this.currentLanguage = 'hindi';
+      } else if (stored === 'marathi' || stored === 'mr') {
+        this.currentLanguage = 'marathi';
+      } else if (stored === 'english' || stored === 'en') {
+        this.currentLanguage = 'english';
       } else {
         this.currentLanguage = DEFAULT_LANGUAGE;
       }
@@ -52,23 +78,37 @@ class LanguageManagerService {
    * Gets current active learning language synchronously.
    */
   getLanguage(): LearningLanguage {
+    try {
+      const { useAppLanguageStore } = require('../state/appLanguageStore');
+      const storeLang = useAppLanguageStore.getState().learningLanguage;
+      if (storeLang === 'hi' || storeLang === 'hindi') return 'hindi';
+      if (storeLang === 'mr' || storeLang === 'marathi') return 'marathi';
+      if (storeLang === 'en' || storeLang === 'english') return 'english';
+    } catch {}
     return this.currentLanguage;
   }
 
   /**
    * Sets and persists the global learning language.
    */
-  async setLanguage(lang: LearningLanguage): Promise<void> {
-    this.currentLanguage = lang;
+  async setLanguage(lang: LearningLanguage | 'en' | 'hi' | 'mr'): Promise<void> {
+    const normalized: LearningLanguage =
+      lang === 'hi' || lang === 'hindi'
+        ? 'hindi'
+        : lang === 'mr' || lang === 'marathi'
+        ? 'marathi'
+        : 'english';
+
+    this.currentLanguage = normalized;
     this.syncI18n();
 
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(STORAGE_KEY, lang);
+        window.localStorage.setItem(STORAGE_KEY, normalized);
       } else {
         try {
           const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-          await AsyncStorage.setItem(STORAGE_KEY, lang);
+          await AsyncStorage.setItem(STORAGE_KEY, normalized);
         } catch {
           // Storage fallback
         }

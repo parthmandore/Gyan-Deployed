@@ -51,6 +51,8 @@ export interface PutInOrderSessionResults {
   xpEarned: number;
   durationSeconds: number;
   isTimeExpired?: boolean;
+  isAbandoned?: boolean;
+  itemsAttempted?: number;
 }
 
 export type PutInOrderStackParamList = {

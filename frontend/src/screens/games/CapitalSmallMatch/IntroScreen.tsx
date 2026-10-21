@@ -6,7 +6,8 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { navigateToGameCatalog } from '../../../navigation/navigationHelpers';
+import { View, StyleSheet , BackHandler } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
@@ -51,6 +52,14 @@ const CAPITAL_SMALL_MATCH_TUTORIAL_STEPS: TutorialStep[] = [
 export const IntroScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
+  useEffect(() => {
+    const onBackPress = () => {
+      navigateToGameCatalog(navigation);
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [navigation]);
   const resetSession = useCapitalSmallMatchStore((s) => s.resetSession);
 
   const [showTutorial, setShowTutorial] = useState(false);
@@ -71,7 +80,7 @@ export const IntroScreen: React.FC = React.memo(() => {
   }, [resetSession, navigation]);
 
   const handleBack = useCallback(() => {
-    (navigation as any).navigate('GameCatalog');
+    navigateToGameCatalog(navigation);
   }, [navigation]);
 
   const handleOpenTutorial = useCallback(() => {

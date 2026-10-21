@@ -25,16 +25,22 @@ console.log('Age 6 Games (' + ageGroups[6].length + '):', ageGroups[6]);
 console.log('Age 7 Games (' + ageGroups[7].length + '):', ageGroups[7]);
 console.log('Age 8 Games (' + ageGroups[8].length + '):', ageGroups[8]);
 
-assert.ok(ageGroups[5].length >= 8, 'Age 5 must have foundational games');
-assert.ok(ageGroups[6].length >= 10, 'Age 6 must have intermediate games');
-assert.ok(ageGroups[7].length >= 10, 'Age 7 must have advanced games');
-assert.strictEqual(ageGroups[8].length, 6, 'Age 8 must have exactly 6 chosen challenging games');
+assert.ok(ageGroups[5].length >= 20, `Age 5 must have at least 20 games, found ${ageGroups[5].length}`);
+assert.ok(ageGroups[6].length >= 20, `Age 6 must have at least 20 games, found ${ageGroups[6].length}`);
+assert.ok(ageGroups[7].length >= 20, `Age 7 must have at least 20 games, found ${ageGroups[7].length}`);
+assert.ok(ageGroups[8].length >= 20, `Age 8 must have at least 20 games, found ${ageGroups[8].length}`);
 
-// Verify that the 6 chosen games exist in Age 7 or Age 6 as well
-for (const g of ageGroups[8]) {
-  const inOtherAge = ageGroups[6].includes(g) || ageGroups[7].includes(g);
-  assert.ok(inOtherAge, `Game ${g} must be reused from Age 6 or 7 without removing it`);
-}
+// Check 5-6 union and 7-8 union
+const age56 = Array.from(new Set([...ageGroups[5], ...ageGroups[6]]));
+const age78 = Array.from(new Set([...ageGroups[7], ...ageGroups[8]]));
+assert.ok(age56.length >= 20, `Ages 5-6 union must have >= 20 games, found ${age56.length}`);
+assert.ok(age78.length >= 20, `Ages 7-8 union must have >= 20 games, found ${age78.length}`);
 
-console.log('\n[PASS] Age 8 reuses 6 challenging games without removing them from Age 6 or 7!');
-console.log('Age 8 games:', ageGroups[8].join(', '));
+console.log('\n[PASS] Phase 5 Age Requirements Satisfied!');
+console.log(`Age 5: ${ageGroups[5].length} games`);
+console.log(`Age 6: ${ageGroups[6].length} games`);
+console.log(`Ages 5-6 unique games: ${age56.length}`);
+console.log(`Age 7: ${ageGroups[7].length} games`);
+console.log(`Age 8: ${ageGroups[8].length} games`);
+console.log(`Ages 7-8 unique games: ${age78.length}`);
+

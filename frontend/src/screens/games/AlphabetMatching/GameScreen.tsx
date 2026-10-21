@@ -78,11 +78,17 @@ export const GameScreen: React.FC = React.memo(() => {
 
   const { width: screenWidth } = useWindowDimensions();
 
+  const handleEarlyQuitRef = useRef<() => void>(() => {});
+
   // Unified Session Lifecycle
   const lifecycle = useGameSessionLifecycle({
     gameId: 'alphabet_matching',
     screenName: 'AlphabetMatchingGame',
     onQuitModalToggle: (visible) => setShowExitModal(visible),
+    onQuitToReport: () => handleEarlyQuitRef.current(),
+    onCleanup: () => {
+      useAlphabetMatchingStore.getState().resetSession();
+    },
   });
 
   const isAudioLoading = useSpeechPlaybackStore((s) => s.isLoading);
@@ -135,11 +141,11 @@ export const GameScreen: React.FC = React.memo(() => {
   const currentRound = rounds[roundIndex] || null;
 
   const playLetterAudio = useCallback(async (letter: string, cachedUrl?: string | null) => {
-    if (!letter || !isMountedRef.current) return;
+    if (!letter || !isMountedRef.current || !lifecycle.isSessionActive()) return;
     setIsAudioLoading(true);
     try {
-      const result = await speakLetter(letter, cachedUrl);
-      if (!isMountedRef.current) return;
+      const result = await lifecycle.safeSpeakLetter(letter, cachedUrl);
+      if (!isMountedRef.current || !lifecycle.isSessionActive()) return;
       if (!result.success) {
         const err = (result.error || '').toLowerCase();
         if (!err.includes('cancel') && !err.includes('interrupt')) {
@@ -147,7 +153,7 @@ export const GameScreen: React.FC = React.memo(() => {
         }
       }
     } catch (error) {
-      if (isMountedRef.current) {
+      if (isMountedRef.current && lifecycle.isSessionActive()) {
         console.error(`[GameScreen] Exception during playLetterAudio("${letter}"):`, error);
       }
     } finally {
@@ -155,7 +161,7 @@ export const GameScreen: React.FC = React.memo(() => {
         setIsAudioLoading(false);
       }
     }
-  }, [setIsAudioLoading]);
+  }, [lifecycle, setIsAudioLoading]);
 
   const loadRound = useCallback((roundData: RoundContent, index: number) => {
     activeRoundRef.current = roundData;
@@ -182,8 +188,8 @@ export const GameScreen: React.FC = React.memo(() => {
     playLetterAudio(roundData.target_letter, roundData.audio_url);
   }, [currentDifficulty, gridOpacity, gridScale, playLetterAudio]);
 
-  const finishSessionAndSubmitProgress = useCallback(async () => {
-    lifecycle.completeSession(async () => {
+  const finishSessionAndSubmitProgress = useCallback(async (isAbandoned = false) => {
+    const doFinish = async () => {
       setShowCelebration(false);
       setShowTeaching(false);
       setShowFlyingStar(false);
@@ -192,24 +198,30 @@ export const GameScreen: React.FC = React.memo(() => {
       const finalState = useAlphabetMatchingStore.getState();
       const finalDifficulty = currentDifficulty;
       const sessionStart = sessionStartTimeRef.current;
-      const finalAttempted = finalState.itemsAttempted;
+      const finalAttempted = isAbandoned ? roundIndex : finalState.itemsAttempted;
       const finalCorrect = finalState.itemsCorrect;
 
       const durationSeconds = Math.max(1, Math.round((Date.now() - sessionStart) / 1000));
-      const accuracy = finalAttempted > 0 ? (finalCorrect / finalAttempted) * 100 : 0;
-      const starsEarned = Math.min(3, Math.max(1, Math.ceil((finalCorrect / (sessionLength || 10)) * 3)));
-      const xpEarned = starsEarned * 50 + finalCorrect * 10;
+      const accuracy = finalAttempted > 0 ? Math.round((finalCorrect / finalAttempted) * 100) : 0;
+      const starsEarned = isAbandoned
+        ? (finalCorrect >= 3 ? 2 : finalCorrect >= 1 ? 1 : 0)
+        : Math.min(3, Math.max(1, Math.ceil((finalCorrect / (sessionLength || 10)) * 3)));
+      const xpEarned = isAbandoned
+        ? finalCorrect * 15
+        : starsEarned * 50 + finalCorrect * 10;
 
-      try {
-        await submitGameProgress({
-          game_type: 'alphabet_matching',
-          difficulty: finalDifficulty,
-          items_attempted: finalAttempted,
-          items_correct: finalCorrect,
-          time_taken_seconds: durationSeconds,
-        });
-      } catch (err) {
-        console.warn('[GameScreen] Non-critical progress submission failure (mock handling ok):', err);
+      if (!isAbandoned) {
+        try {
+          await submitGameProgress({
+            game_type: 'alphabet_matching',
+            difficulty: finalDifficulty,
+            items_attempted: finalAttempted,
+            items_correct: finalCorrect,
+            time_taken_seconds: durationSeconds,
+          });
+        } catch (err) {
+          console.warn('[GameScreen] Non-critical progress submission failure (mock handling ok):', err);
+        }
       }
 
       navigation.navigate('AlphabetMatchingSessionComplete', {
@@ -217,13 +229,25 @@ export const GameScreen: React.FC = React.memo(() => {
         xpEarned,
         itemsCorrect: finalCorrect,
         sessionLength,
+        itemsAttempted: finalAttempted,
         accuracy,
         durationSeconds,
-        sessionResults: roundResults,
-        rounds: rounds.map((r) => ({ target_letter: r.target_letter })),
+        sessionResults: roundResults.slice(0, finalAttempted),
+        rounds: rounds.slice(0, finalAttempted).map((r) => ({ target_letter: r.target_letter })),
+        isAbandoned,
       });
-    });
-  }, [lifecycle, currentDifficulty, navigation, sessionLength, roundResults, rounds]);
+    };
+
+    if (isAbandoned) {
+      lifecycle.exitToReport(doFinish);
+    } else {
+      lifecycle.completeSession(doFinish);
+    }
+  }, [lifecycle, currentDifficulty, navigation, sessionLength, roundResults, rounds, roundIndex]);
+
+  useEffect(() => {
+    handleEarlyQuitRef.current = () => finishSessionAndSubmitProgress(true);
+  }, [finishSessionAndSubmitProgress]);
 
   const advanceToNextRound = useCallback(() => {
     setLifecycleState('ADVANCING_NEXT_ROUND');
@@ -246,10 +270,15 @@ export const GameScreen: React.FC = React.memo(() => {
       !isLoading &&
       !showExitModal &&
       !showTeaching &&
-      !showCelebration;
+      !showCelebration &&
+      lifecycle.isSessionActive();
 
     if (isTimerActive && timerSeconds > 0) {
       interval = setInterval(() => {
+        if (!lifecycle.isSessionActive()) {
+          if (interval) clearInterval(interval);
+          return;
+        }
         setTimerSeconds((prev) => Math.max(0, prev - 1));
       }, 1000);
     }
@@ -257,7 +286,7 @@ export const GameScreen: React.FC = React.memo(() => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [lifecycleState, roundLocked, isLoading, showExitModal, showTeaching, showCelebration, timerSeconds]);
+  }, [lifecycleState, roundLocked, isLoading, showExitModal, showTeaching, showCelebration, timerSeconds, lifecycle]);
 
   // Handle Timeout (10 seconds expired without a tap)
   const handleTimeout = useCallback(() => {
@@ -309,10 +338,10 @@ export const GameScreen: React.FC = React.memo(() => {
   }, [roundLocked, currentRound, targetChar, roundIndex, attemptsInCurrentRound, currentOptions, mode, advanceToNextRound, lifecycle]);
 
   useEffect(() => {
-    if (timerSeconds === 0 && (lifecycleState === 'WAITING_FOR_SELECTION' || lifecycleState === 'SECOND_ATTEMPT') && !roundLocked) {
+    if (timerSeconds === 0 && (lifecycleState === 'WAITING_FOR_SELECTION' || lifecycleState === 'SECOND_ATTEMPT') && !roundLocked && lifecycle.isSessionActive()) {
       handleTimeout();
     }
-  }, [timerSeconds, lifecycleState, roundLocked, handleTimeout]);
+  }, [timerSeconds, lifecycleState, roundLocked, handleTimeout, lifecycle]);
 
   useEffect(() => {
     let isMounted = true;
@@ -369,6 +398,7 @@ export const GameScreen: React.FC = React.memo(() => {
   const handleTilePress = useCallback((tappedLetter: string) => {
     if (roundLocked || !currentRound) return;
     setRoundLocked(true);
+    speakPhrase(tappedLetter, { cancelPrevious: true });
 
     const isCorrect = tappedLetter.toUpperCase() === targetChar.toUpperCase();
     const store = useAlphabetMatchingStore.getState();
@@ -383,7 +413,7 @@ export const GameScreen: React.FC = React.memo(() => {
       setTileStates((prev) => ({ ...prev, [tappedLetter]: 'correct' }));
       setShowFlyingStar(true);
       setShowCelebration(true);
-      speakPraise();
+      lifecycle.safeSpeakPraise();
 
       lifecycle.safeSetTimeout(() => {
         setShowCelebration(false);
@@ -475,8 +505,8 @@ export const GameScreen: React.FC = React.memo(() => {
     setShowCelebration(false);
     setShowTeaching(false);
     setShowFlyingStar(false);
-    lifecycle.exitSession('GameCatalog');
-  }, [lifecycle]);
+    finishSessionAndSubmitProgress(true);
+  }, [finishSessionAndSubmitProgress]);
 
   const totalOptionsCount = getGridSizeForDifficulty(currentDifficulty);
   const numColumns = totalOptionsCount > 4 ? 3 : 2;

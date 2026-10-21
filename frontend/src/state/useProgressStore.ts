@@ -24,6 +24,8 @@ export interface GameSessionRecord {
   starsEarned: number;
   xpEarned: number;
   durationSeconds: number;
+  isAbandoned?: boolean;
+  completed?: boolean;
 }
 
 export interface ProgressSummary extends LevelProgressInfo {
@@ -276,7 +278,8 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     const starsToAdd = Math.max(0, Math.floor(sessionInput.starsEarned || 0));
     const newTotalXp = state.totalXp + xpToAdd;
     const newTotalStars = state.totalStars + starsToAdd;
-    const newCompletedCount = state.completedGamesCount + 1;
+    const isAbandoned = sessionInput.isAbandoned === true || sessionInput.completed === false;
+    const newCompletedCount = isAbandoned ? state.completedGamesCount : state.completedGamesCount + 1;
     const newHistory = [newRecord, ...state.history].slice(0, 100);
 
     const oldLevel = state.currentLevel;

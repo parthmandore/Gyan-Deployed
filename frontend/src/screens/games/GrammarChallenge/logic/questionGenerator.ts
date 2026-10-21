@@ -62,6 +62,22 @@ const TOPIC_PROMPTS: Record<GrammarTopic, { key: string; fallback: string }> = {
     key: 'grammarChallenge.correctionPrompt',
     fallback: 'Select the grammatically correct sentence!',
   },
+  opposite_words: {
+    key: 'grammarChallenge.oppositeWordsPrompt',
+    fallback: 'Find the opposite of this word!',
+  },
+  rhyming_words: {
+    key: 'grammarChallenge.rhymingWordsPrompt',
+    fallback: 'Which word rhymes with this?',
+  },
+  action_words: {
+    key: 'grammarChallenge.actionWordsPrompt',
+    fallback: 'What action is happening here?',
+  },
+  gender_nouns: {
+    key: 'grammarChallenge.genderNounsPrompt',
+    fallback: 'Match the pair (Masculine / Feminine)!',
+  },
 };
 
 export function generateGrammarSession(

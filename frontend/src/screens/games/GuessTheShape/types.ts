@@ -69,6 +69,8 @@ export interface GuessTheShapeSessionResults {
   sessionLength: number;
   accuracy: number;
   isTimeExpired?: boolean;
+  isAbandoned?: boolean;
+  itemsAttempted?: number;
 }
 
 export type GuessTheShapeStackParamList = {

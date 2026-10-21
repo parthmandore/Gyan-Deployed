@@ -221,6 +221,42 @@
     "sentenceCorrection": {
       "title": "Sentence Correction",
       "description": "Spot the grammar mistakes and pick the correct sentence!"
+    },
+    "beginnerAddition": {
+      "title": "Count & Add",
+      "description": "Count cute objects and add them together to find the sum!"
+    },
+    "beginnerSubtraction": {
+      "title": "Take Away (Subtract)",
+      "description": "Take away items from the group and see how many are left!"
+    },
+    "directionArrow": {
+      "title": "Direction Arrow",
+      "description": "Look at the colorful arrows and discover which way they point!"
+    },
+    "countAndCompare": {
+      "title": "Count & Compare",
+      "description": "Compare two groups of items to see which has more or less!"
+    },
+    "shadowMatch": {
+      "title": "Shadow Match",
+      "description": "Match each animal and toy to its mysterious dark silhouette shadow!"
+    },
+    "oppositeWords": {
+      "title": "Opposite Words",
+      "description": "Find the opposite words like Hot and Cold, Big and Small!"
+    },
+    "rhymingWords": {
+      "title": "Rhyming Words",
+      "description": "Discover fun words that rhyme and share the same ending sounds!"
+    },
+    "actionWords": {
+      "title": "Action Words (Verbs)",
+      "description": "Learn fun action words like run, jump, swim, and dance!"
+    },
+    "genderNouns": {
+      "title": "Gender Nouns",
+      "description": "Pair naming words into boy-girl, king-queen, and animal pairs!"
     }
   },
   "alphabetMatching": {
@@ -314,7 +350,44 @@
     "level": "Level {{level}}",
     "xpToNextLevel": "{{xp}} XP to next level",
     "nextLevel": "Next Level",
-    "home": "Home"
+    "home": "Home",
+    "quitEarlyBadge": "⏱️ Quit Early",
+    "quitEarlyPraise": "Good Practice Session! 👍",
+    "zeroActivityTitle": "Session Ended Early 👋",
+    "zeroActivityNotice": "No questions answered this time. Ready when you are!",
+    "attempted": "Attempted",
+    "unanswered": "Unanswered",
+    "viewDetailedReport": "View Detailed Report"
+  },
+  "detailedReport": {
+    "titleSuffix": "Report",
+    "sessionReport": "Session Report",
+    "completed": "✅ Completed",
+    "subtitle": "See how you did on each question and retry!",
+    "attempted": "Attempted",
+    "filterAll": "All",
+    "filter1stTry": "1st Try",
+    "filterRetry": "Retry",
+    "filterPractice": "Practice",
+    "filterUnanswered": "Unanswered",
+    "noMistakes": "Amazing job! No mistakes in this category!",
+    "noQuestions": "No questions to show in this view.",
+    "roundLabel": "Round",
+    "statusUnanswered": "Unanswered",
+    "statusCorrectAfterRetry": "Correct after Retry",
+    "statusFirstTry": "Correct on 1st Try",
+    "statusPractice": "Needs Practice",
+    "attemptHistory": "Attempt History:",
+    "attempt": "Attempt",
+    "yourAnswer": "Your Answer:",
+    "notAttempted": "— Not Attempted —",
+    "correctAnswer": "Correct Answer:"
+  },
+  "loginLanguage": {
+    "appLanguageTitle": "App Language (Interface)",
+    "appLanguageSubtitle": "Which language should the app talk to you in?",
+    "learningLanguageTitle": "Language to Learn (Games)",
+    "learningLanguageSubtitle": "Which language do you want to learn in all games?"
   },
   "accessibility": {
     "correctCelebration": "Correct answer celebration",
@@ -485,7 +558,15 @@
     "howToPlaySubtraction": "1. Look at the subtraction equation.\n2. Subtract the second number from the first.\n3. Tap the card with the correct answer.\n4. Complete all 5 rounds to win 3 stars! ⭐",
     "howToPlayBiggerAddition": "1. Look at the two-digit addition equation.\n2. Add the tens and ones carefully.\n3. Tap the card with the total sum.\n4. Complete all 5 rounds to win 3 stars! ⭐",
     "howToPlayMultiplication": "1. Look at the multiplication equation.\n2. Multiply the two numbers using times tables.\n3. Tap the matching product card.\n4. Complete all 5 rounds to win 3 stars! ⭐",
-    "howToPlayDivision": "1. Look at the division equation.\n2. Divide the number equally into groups.\n3. Tap the card with the exact quotient.\n4. Complete all 5 rounds to win 3 stars! ⭐"
+    "howToPlayDivision": "1. Look at the division equation.\n2. Divide the number equally into groups.\n3. Tap the card with the exact quotient.\n4. Complete all 5 rounds to win 3 stars! ⭐",
+    "beginnerAdditionTitle": "Count & Add",
+    "beginnerAdditionHero": "Count & Add Adventures!",
+    "beginnerAdditionDesc": "Count the items on each side and add them together!",
+    "howToPlayBeginnerAddition": "Count the first group, then the second, and tap the total answer!",
+    "beginnerSubtractionTitle": "Take Away Fun",
+    "beginnerSubtractionHero": "Take Away Fun!",
+    "beginnerSubtractionDesc": "See how many items are taken away and find the remainder!",
+    "howToPlayBeginnerSubtraction": "Look at the total items, subtract the taken away ones, and tap the answer!"
   },
   "aptitudeChallenge": {
     "title": "Aptitude & Logic",
@@ -542,7 +623,19 @@
     "mascotSpeech": "Ready to train your brain? Tap Start to play!",
     "highlight5Rounds": "5 Quick Challenges",
     "highlightStars": "Earn Stars & XP",
-    "highlightPraise": "Child-Friendly Clues"
+    "highlightPraise": "Child-Friendly Clues",
+    "directionArrowHero": "Follow the Arrow!",
+    "directionArrowDesc": "Learn left, right, up, and down with colorful arrows!",
+    "howToPlayDirectionArrow": "Look at the direction the arrow is pointing and tap the matching label!",
+    "directionArrowPrompt": "Which way is the arrow pointing?",
+    "countAndCompareHero": "More or Less Challenge!",
+    "countAndCompareDesc": "Compare groups and find which side has more!",
+    "howToPlayCountAndCompare": "Count items in both groups and tap the group that has more!",
+    "countAndComparePrompt": "Which group has MORE items?",
+    "shadowMatchHero": "Shadow Detective!",
+    "shadowMatchDesc": "Match each picture with its dark silhouette shadow!",
+    "howToPlayShadowMatch": "Examine the shape of the shadow and choose the matching real object!",
+    "shadowMatchPrompt": "Which picture matches this shadow?"
   },
   "grammarChallenge": {
     "title": "Basic Grammar",
@@ -591,7 +684,23 @@
     "mascotSpeech": "Ready to master words and sentences? Tap Start!",
     "highlight5Questions": "5 Child-Friendly Questions",
     "highlightStars": "Earn Stars & Grammar XP",
-    "highlightPraise": "Instant Feedback & Audio"
+    "highlightPraise": "Instant Feedback & Audio",
+    "oppositeWordsHero": "Opposites World!",
+    "oppositeWordsDesc": "Pair opposites like Hot-Cold, Big-Small, Day-Night!",
+    "howToPlayOppositeWords": "Look at the word and picture, then pick its exact opposite!",
+    "oppositeWordsPrompt": "Find the opposite of this word!",
+    "rhymingWordsHero": "Rhyme Time!",
+    "rhymingWordsDesc": "Find words that sound alike at the end like Cat & Hat!",
+    "howToPlayRhymingWords": "Say the word out loud and tap the card that rhymes with it!",
+    "rhymingWordsPrompt": "Which word rhymes with this?",
+    "actionWordsHero": "Action Heroes!",
+    "actionWordsDesc": "Spot what everyone is doing: running, jumping, eating, sleeping!",
+    "howToPlayActionWords": "Look at what is happening and choose the correct action word!",
+    "actionWordsPrompt": "What action is happening here?",
+    "genderNounsHero": "Pairing Pals!",
+    "genderNounsDesc": "Match masculine and feminine pairs like Boy-Girl and King-Queen!",
+    "howToPlayGenderNouns": "Read the word and pick its matching gender partner!",
+    "genderNounsPrompt": "Match the pair (Masculine / Feminine)!"
   },
   "missingLetters": {
     "title": "Missing Letters 🔤",

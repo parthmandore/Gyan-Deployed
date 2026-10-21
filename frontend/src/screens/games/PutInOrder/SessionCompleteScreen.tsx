@@ -13,7 +13,9 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { GameSessionCompleteView } from '../../../components';
+import { navigateToGameCatalog, navigateToChildDashboard } from '../../../navigation/navigationHelpers';
 import { GameAnalysisReportModal, GameQuestionReportItem } from '../../../components/GameAnalysisReportModal';
+import { buildStandardizedReportItems } from '../../../utils/gameReportAdapter';
 import { useAppLanguageStore } from '../../../state/appLanguageStore';
 import { useProgressStore } from '../../../state/useProgressStore';
 import { usePutInOrderStore } from './store/usePutInOrderStore';
@@ -47,6 +49,8 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
     xpEarned = 75,
     durationSeconds = 30,
   } = (route.params as any) || {};
+  const isAbandoned = ((route.params as any) || {}).isAbandoned === true;
+  const itemsAttempted = ((route.params as any) || {}).itemsAttempted !== undefined ? ((route.params as any) || {}).itemsAttempted : totalQuestions;
 
   const accuracy = Math.round((correctAnswers / Math.max(totalQuestions, 1)) * 100);
   const starCount = accuracy >= 80 ? 3 : accuracy >= 50 ? 2 : 1;
@@ -63,7 +67,9 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
       learningLanguage,
       motherTongue,
       age: selectedAge,
-      itemsAttempted: totalQuestions,
+      itemsAttempted: isAbandoned ? itemsAttempted : totalQuestions,
+      isAbandoned,
+      completed: !isAbandoned,
       itemsCorrect: correctAnswers,
       accuracy,
       starsEarned: starCount,
@@ -73,11 +79,13 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   }, [correctAnswers, totalQuestions, accuracy, starCount, xpEarned, durationSeconds, learningLanguage, motherTongue, selectedAge]);
 
   useEffect(() => {
-    const praiseText = t(
+    if (!isAbandoned) {
+      const praiseText = t(
       'putInOrder.sessionCompletePraise',
       'You are an ordering champion!'
     );
     speakPhrase(praiseText, { language: motherTongue });
+    }
 
     const unsubscribe = navigation.addListener('beforeRemove', () => {
       stopSpeech();
@@ -100,29 +108,24 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   const handleBackToDashboard = () => {
     stopSpeech();
     resetGame();
-    navigation.navigate('ChildDashboard' as any);
+    navigateToChildDashboard(navigation);
   };
 
   const handleBackToCatalog = () => {
     stopSpeech();
     resetGame();
-    navigation.navigate('GameCatalog' as any);
+    navigateToGameCatalog(navigation);
   };
 
-  const reportItems: GameQuestionReportItem[] = attempts.map((att) => {
-    const roundNum = att.roundIndex + 1;
-    const r = rounds.find((rnd) => rnd.roundNumber === roundNum);
-    const targetOrder = r ? r.items.map((it: OrderItem) => it.display).join(' ➔ ') : 'In order';
-    return {
-      roundNumber: roundNum,
-      questionLabel: `Round ${roundNum} (${r?.type || 'Sequence'}): ${targetOrder}`,
-      userAnswer: att.isCorrect ? 'Correct Order ✓' : 'Out of order',
-      correctAnswer: targetOrder,
-      isCorrect: att.isCorrect,
-      attemptsCount: 1,
-      xpEarned: att.isCorrect ? 15 : 0,
-    };
+  const reportSummary = buildStandardizedReportItems({
+    sessionLength: totalQuestions,
+    itemsAttempted,
+    isAbandoned,
+    attempts,
+    rounds,
+    fallbackLabelPrefix: 'Sequence Round',
   });
+  const reportItems = reportSummary.items;
 
   return (
     <View style={styles.root}>
@@ -134,9 +137,11 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         accuracy={accuracy}
         xpEarned={xpEarned}
         onPlayAgain={handlePlayAgain}
+        isAbandoned={isAbandoned}
+        itemsAttempted={itemsAttempted}
         onChooseGame={handleBackToCatalog}
         onReturnToDashboard={handleBackToDashboard}
-        onViewReport={reportItems.length > 0 ? () => setShowReportModal(true) : undefined}
+        onViewReport={() => setShowReportModal(true)}
         bgTheme="puzzle"
       />
 
@@ -144,6 +149,15 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         visible={showReportModal}
         onClose={() => setShowReportModal(false)}
         gameTitle={t('games.putInOrder.title', 'Put in Order')}
+        isAbandoned={isAbandoned}
+        totalQuestions={reportSummary.totalQuestions}
+        questionsAttempted={reportSummary.questionsAttempted}
+        firstTryCorrectCount={reportSummary.firstTryCorrectCount}
+        correctedAfterRetryCount={reportSummary.correctedAfterRetryCount}
+        stillIncorrectCount={reportSummary.stillIncorrectCount}
+        unansweredCount={reportSummary.unansweredCount}
+        accuracy={accuracy ?? reportSummary.accuracy}
+        xpEarned={xpEarned}
         items={reportItems}
       />
     </View>

@@ -40,7 +40,7 @@ let praiseIndex = 0;
 /**
  * Speaks a rotating language-aware praise phrase aloud.
  */
-export const speakPraise = (overrideLang?: 'en' | 'hi' | 'mr' | string): void => {
+export const speakPraise = (overrideLang?: 'en' | 'hi' | 'mr' | string, sessionId?: string): void => {
   let lang = 'english';
   let speechCode: 'en' | 'hi' | 'mr' | undefined = undefined;
 
@@ -80,7 +80,10 @@ export const speakPraise = (overrideLang?: 'en' | 'hi' | 'mr' | string): void =>
   praiseIndex++;
 
   try {
-    speakPhrase(phrase, speechCode ? { language: speechCode } : undefined);
+    speakPhrase(phrase, {
+      language: speechCode,
+      sessionId,
+    });
   } catch (error) {
     console.warn('[praiseService] praise audio failed:', error);
   }

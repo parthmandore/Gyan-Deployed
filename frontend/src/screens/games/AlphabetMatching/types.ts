@@ -43,5 +43,7 @@ export type AlphabetMatchingStackParamList = {
     durationSeconds: number;
     sessionResults?: Array<'correct' | 'wrong' | 'pending'>;
     rounds?: Array<{ target_letter: string }>;
+    isAbandoned?: boolean;
+    itemsAttempted?: number;
   } | undefined;
 };

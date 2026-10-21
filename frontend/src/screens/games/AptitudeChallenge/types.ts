@@ -13,7 +13,10 @@ export type AptitudeGameType =
   | 'number_pattern'
   | 'odd_one_out'
   | 'logical_sequence'
-  | 'visual_reasoning';
+  | 'visual_reasoning'
+  | 'direction_arrow'
+  | 'count_and_compare'
+  | 'shadow_match';
 
 export interface AptitudeOption {
   id: string;
@@ -73,5 +76,7 @@ export type AptitudeChallengeStackParamList = {
     sessionLength: number;
     accuracy: number;
     isTimeExpired?: boolean;
-  };
+    isAbandoned?: boolean;
+  itemsAttempted?: number;
+};
 };

@@ -59,15 +59,14 @@ const signUpPath = path.join(__dirname, 'src/screens/SignUpProfileScreen.tsx');
 const signUpCode = fs.readFileSync(signUpPath, 'utf8');
 
 assert(
-  signUpCode.includes('Choose Your Buddy') &&
-  signUpCode.includes("What's your name?") &&
-  signUpCode.includes('Create your username') &&
-  signUpCode.includes('Create your 4-digit PIN') &&
-  signUpCode.includes('How old are you?') &&
-  signUpCode.includes('App Language') &&
-  signUpCode.includes('What do you want to learn?'),
-  'SignUpProfileScreen: All 7 required fields present in single scrollable page',
-  'Buddy, Name, Username, PIN, Age (5-8), App Language, Learning Language.'
+  signUpCode.includes('onboarding.chooseBuddy') &&
+  signUpCode.includes('onboarding.whatsYourName') &&
+  signUpCode.includes('onboarding.createUsername') &&
+  signUpCode.includes('onboarding.createPin') &&
+  signUpCode.includes('onboarding.howOldAreYou') &&
+  signUpCode.includes('onboarding.chooseLanguage'),
+  'SignUpProfileScreen: All required fields present in single scrollable page',
+  'Buddy, Name, Username, PIN, Age (5-8), and Language.'
 );
 
 assert(
@@ -181,9 +180,9 @@ assert(
 );
 
 assert(
-  catalogCode.includes('ageSelectorContainer') && catalogCode.includes('handleSelectAge'),
-  'GameCatalogScreen: In-Place Age Personalization Switcher (Ages 5, 6, 7, 8)',
-  'Child/parent can instantly switch age groups without exiting the catalog.'
+  catalogCode.includes('selectedAge') && catalogCode.includes('game.ageGroups.includes(selectedAge)'),
+  'GameCatalogScreen: Persistent Child Age Filtering (Ages 5-8)',
+  'Child age is loaded directly from profile store and not re-requested in the catalog.'
 );
 
 assert(
@@ -279,7 +278,6 @@ const GAMES_LIST = [
   'MissingLetterWords',
   'FindTheCorrectWord',
   'LanguagePairMatch',
-  'SpeechWordChallenge',
   'MissingNumbers',
   'NumberCounting',
   'MathChallenge',
@@ -409,7 +407,7 @@ const dashServiceCode = fs.readFileSync(path.join(__dirname, 'src/services/dashb
 assert(
   dashServiceCode.includes('quick_learner') &&
   dashServiceCode.includes('vocabulary_explorer') &&
-  dashServiceCode.includes('confident_speaker') &&
+  dashServiceCode.includes('visual_explorer') &&
   dashServiceCode.includes('math_wizard') &&
   dashServiceCode.includes('shape_color_prodigy') &&
   dashServiceCode.includes('learning_streak') &&

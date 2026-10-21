@@ -41,6 +41,44 @@ const NUMBER_WORDS: Record<string, string> = {
  */
 
 let _speechSessionId = 0;
+let _activeGameSessionId: string | null = null;
+const _abandonedSessionIds = new Set<string>();
+
+/**
+ * Registers the currently active game session ID.
+ * Calling this activates speech permissions for this session and invalidates any previous session.
+ */
+export const registerActiveGameSession = (sessionId: string): void => {
+  _activeGameSessionId = sessionId;
+  _abandonedSessionIds.delete(sessionId);
+};
+
+/**
+ * Marks a game session as abandoned / exited.
+ * Immediately terminates any ongoing speech and permanently blocks any future speech
+ * requests belonging to this session.
+ */
+export const abandonGameSession = (sessionId?: string): void => {
+  if (sessionId) {
+    _abandonedSessionIds.add(sessionId);
+    if (_activeGameSessionId === sessionId) {
+      _activeGameSessionId = null;
+    }
+  } else {
+    _activeGameSessionId = null;
+  }
+  stopSpeech();
+};
+
+/**
+ * Checks if a session is valid and active.
+ */
+export const isSessionActive = (sessionId?: string): boolean => {
+  if (!sessionId) return true;
+  if (_abandonedSessionIds.has(sessionId)) return false;
+  if (_activeGameSessionId && _activeGameSessionId !== sessionId) return false;
+  return true;
+};
 
 /**
  * Detects and returns the best matching TTS voice for the active learning language.
@@ -116,8 +154,12 @@ export const getVoiceForLanguage = async (targetLang: 'english' | 'hindi' | 'mar
  */
 export const speakWord = async (
   word: string,
-  language?: string
+  language?: string,
+  sessionId?: string
 ): Promise<PlaybackResult> => {
+  if (!isSessionActive(sessionId)) {
+    return { success: false, source: 'local_tts_fallback', error: 'Session abandoned' };
+  }
   let lang = language;
   if (!lang) {
     try {
@@ -127,7 +169,7 @@ export const speakWord = async (
       lang = 'en';
     }
   }
-  return speakPhrase(word, { cancelPrevious: true, language: lang });
+  return speakPhrase(word, { cancelPrevious: true, language: lang, sessionId });
 };
 
 /**
@@ -159,8 +201,13 @@ export const getSpeechSessionId = (): number => _speechSessionId;
 export const speakLetter = async (
   letter: string,
   cachedAudioUrl?: string | null,
-  targetLang?: string
+  targetLang?: string,
+  sessionId?: string
 ): Promise<PlaybackResult> => {
+  if (!isSessionActive(sessionId)) {
+    return { success: false, source: 'local_tts_fallback', error: 'Session abandoned' };
+  }
+
   stopSpeech();
   const sessionForThisCall = _speechSessionId;
 
@@ -181,7 +228,7 @@ export const speakLetter = async (
 
     const voiceInfo = await getVoiceForLanguage(lang);
 
-    if (_speechSessionId !== sessionForThisCall) {
+    if (_speechSessionId !== sessionForThisCall || !isSessionActive(sessionId)) {
       return { success: false, source: 'local_tts_fallback', error: 'Cancelled' };
     }
 
@@ -203,7 +250,7 @@ export const speakLetter = async (
     audioManager.duck();
 
     return new Promise<PlaybackResult>((resolve) => {
-      if (_speechSessionId !== sessionForThisCall) {
+      if (_speechSessionId !== sessionForThisCall || !isSessionActive(sessionId)) {
         audioManager.unduck();
         resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
         return;
@@ -225,7 +272,7 @@ export const speakLetter = async (
 
         utterance.onend = () => {
           audioManager.unduck();
-          if (_speechSessionId !== sessionForThisCall) {
+          if (_speechSessionId !== sessionForThisCall || !isSessionActive(sessionId)) {
             resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
             return;
           }
@@ -236,7 +283,7 @@ export const speakLetter = async (
         utterance.onerror = (e: any) => {
           audioManager.unduck();
           const errStr = e?.error ? String(e.error).toLowerCase() : '';
-          if (_speechSessionId !== sessionForThisCall || errStr.includes('cancel') || errStr.includes('interrupt')) {
+          if (_speechSessionId !== sessionForThisCall || !isSessionActive(sessionId) || errStr.includes('cancel') || errStr.includes('interrupt')) {
             resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
             return;
           }
@@ -244,7 +291,7 @@ export const speakLetter = async (
           resolve({ success: false, source: 'local_tts_fallback', error: String(e?.error || e) });
         };
 
-        if (_speechSessionId !== sessionForThisCall) {
+        if (_speechSessionId !== sessionForThisCall || !isSessionActive(sessionId)) {
           audioManager.unduck();
           resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
           return;
@@ -261,14 +308,14 @@ export const speakLetter = async (
         rate: 0.60,
         onDone: () => {
           audioManager.unduck();
-          if (_speechSessionId !== sessionForThisCall) return;
+          if (_speechSessionId !== sessionForThisCall || !isSessionActive(sessionId)) return;
           console.log(`[speechService] Audio playback DONE for "${spokenText}"`);
           resolve({ success: true, source: 'local_tts_fallback' });
         },
         onError: (error) => {
           audioManager.unduck();
           const errStr = String(error).toLowerCase();
-          if (_speechSessionId !== sessionForThisCall || errStr.includes('cancel') || errStr.includes('interrupt')) {
+          if (_speechSessionId !== sessionForThisCall || !isSessionActive(sessionId) || errStr.includes('cancel') || errStr.includes('interrupt')) {
             resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
             return;
           }
@@ -279,6 +326,12 @@ export const speakLetter = async (
 
       if (voiceInfo.name && voiceInfo.hasNativeVoice) {
         options.voice = voiceInfo.name;
+      }
+
+      if (_speechSessionId !== sessionForThisCall || !isSessionActive(sessionId)) {
+        audioManager.unduck();
+        resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+        return;
       }
 
       Speech.speak(spokenText, options);
@@ -295,8 +348,12 @@ export const speakLetter = async (
  */
 export const speakPhrase = async (
   phrase: string,
-  options?: { cancelPrevious?: boolean; language?: string }
+  options?: { cancelPrevious?: boolean; language?: string; sessionId?: string }
 ): Promise<PlaybackResult> => {
+  if (!isSessionActive(options?.sessionId)) {
+    return { success: false, source: 'local_tts_fallback', error: 'Session abandoned' };
+  }
+
   const shouldCancel = options?.cancelPrevious ?? true;
   if (shouldCancel) {
     stopSpeech();
@@ -324,7 +381,7 @@ export const speakPhrase = async (
 
     const voiceInfo = await getVoiceForLanguage(lang);
 
-    if (_speechSessionId !== sessionForThisCall) {
+    if (_speechSessionId !== sessionForThisCall || !isSessionActive(options?.sessionId)) {
       return { success: false, source: 'local_tts_fallback', error: 'Cancelled' };
     }
 
@@ -333,7 +390,7 @@ export const speakPhrase = async (
     audioManager.duck();
 
     return new Promise<PlaybackResult>((resolve) => {
-      if (_speechSessionId !== sessionForThisCall) {
+      if (_speechSessionId !== sessionForThisCall || !isSessionActive(options?.sessionId)) {
         audioManager.unduck();
         resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
         return;
@@ -355,7 +412,7 @@ export const speakPhrase = async (
 
         utterance.onend = () => {
           audioManager.unduck();
-          if (_speechSessionId !== sessionForThisCall) {
+          if (_speechSessionId !== sessionForThisCall || !isSessionActive(options?.sessionId)) {
             resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
             return;
           }
@@ -366,7 +423,7 @@ export const speakPhrase = async (
         utterance.onerror = (e: any) => {
           audioManager.unduck();
           const errStr = e?.error ? String(e.error).toLowerCase() : '';
-          if (_speechSessionId !== sessionForThisCall || errStr.includes('cancel') || errStr.includes('interrupt')) {
+          if (_speechSessionId !== sessionForThisCall || !isSessionActive(options?.sessionId) || errStr.includes('cancel') || errStr.includes('interrupt')) {
             resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
             return;
           }
@@ -374,7 +431,7 @@ export const speakPhrase = async (
           resolve({ success: false, source: 'local_tts_fallback', error: String(e?.error || e) });
         };
 
-        if (_speechSessionId !== sessionForThisCall) {
+        if (_speechSessionId !== sessionForThisCall || !isSessionActive(options?.sessionId)) {
           audioManager.unduck();
           resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
           return;
@@ -391,14 +448,14 @@ export const speakPhrase = async (
         rate: 0.65,
         onDone: () => {
           audioManager.unduck();
-          if (_speechSessionId !== sessionForThisCall) return;
+          if (_speechSessionId !== sessionForThisCall || !isSessionActive(options?.sessionId)) return;
           console.log(`[speechService] Phrase playback DONE: "${phrase}"`);
           resolve({ success: true, source: 'local_tts_fallback' });
         },
         onError: (error) => {
           audioManager.unduck();
           const errStr = String(error).toLowerCase();
-          if (_speechSessionId !== sessionForThisCall || errStr.includes('cancel') || errStr.includes('interrupt')) {
+          if (_speechSessionId !== sessionForThisCall || !isSessionActive(options?.sessionId) || errStr.includes('cancel') || errStr.includes('interrupt')) {
             resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
             return;
           }
@@ -409,6 +466,12 @@ export const speakPhrase = async (
 
       if (voiceInfo.name && voiceInfo.hasNativeVoice) {
         speechOpts.voice = voiceInfo.name;
+      }
+
+      if (_speechSessionId !== sessionForThisCall || !isSessionActive(options?.sessionId)) {
+        audioManager.unduck();
+        resolve({ success: false, source: 'local_tts_fallback', error: 'Cancelled' });
+        return;
       }
 
       Speech.speak(phrase, speechOpts);

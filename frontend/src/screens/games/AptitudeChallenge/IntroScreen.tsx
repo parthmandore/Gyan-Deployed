@@ -7,14 +7,14 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { navigateToGameCatalog } from '../../../navigation/navigationHelpers';
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
   ScrollView,
-  useWindowDimensions,
-} from 'react-native';
+  useWindowDimensions, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -99,11 +99,43 @@ const GAME_METADATA: Record<
     ageBadge: '🏆 Age 7: Visual Reasoning',
     accentColor: '#6366F1',
   },
+  direction_arrow: {
+    heroKey: 'aptitudeChallenge.directionArrowHero',
+    descKey: 'aptitudeChallenge.directionArrowDesc',
+    howToPlayKey: 'aptitudeChallenge.howToPlayDirectionArrow',
+    icon: '🧭',
+    ageBadge: '🌱 Age 5: Direction Arrow',
+    accentColor: '#F97316',
+  },
+  count_and_compare: {
+    heroKey: 'aptitudeChallenge.countAndCompareHero',
+    descKey: 'aptitudeChallenge.countAndCompareDesc',
+    howToPlayKey: 'aptitudeChallenge.howToPlayCountAndCompare',
+    icon: '⚖️',
+    ageBadge: '🌱 Age 5: More or Less',
+    accentColor: '#14B8A6',
+  },
+  shadow_match: {
+    heroKey: 'aptitudeChallenge.shadowMatchHero',
+    descKey: 'aptitudeChallenge.shadowMatchDesc',
+    howToPlayKey: 'aptitudeChallenge.howToPlayShadowMatch',
+    icon: '👤',
+    ageBadge: '🌱 Age 5: Shadow Match',
+    accentColor: '#A855F7',
+  },
 };
 
 export const IntroScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
+  useEffect(() => {
+    const onBackPress = () => {
+      navigateToGameCatalog(navigation);
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [navigation]);
   const route = useRoute<RouteProps>();
   const { width: screenWidth } = useWindowDimensions();
 
@@ -133,11 +165,7 @@ export const IntroScreen: React.FC = React.memo(() => {
 
   const handleGoBack = () => {
     stopSpeech();
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      (navigation as any).navigate('GameCatalog');
-    }
+    navigateToGameCatalog(navigation);
   };
 
   return (

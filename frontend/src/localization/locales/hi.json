@@ -221,6 +221,42 @@
     "sentenceCorrection": {
       "title": "शुद्ध वाक्य चयन",
       "description": "व्याकरण की अशुद्धियों को पहचानकर सही वाक्य चुनें!"
+    },
+    "beginnerAddition": {
+      "title": "गिनो और जोड़ो",
+      "description": "चीज़ों को गिनें और उन्हें जोड़कर कुल संख्या बताएं!"
+    },
+    "beginnerSubtraction": {
+      "title": "घटाओ और सीखो",
+      "description": "चीज़ों को कम करें और देखें कि कितने बचे!"
+    },
+    "directionArrow": {
+      "title": "दिशा तीर",
+      "description": "रंग-बिरंगे तीरों को देखें और पहचानें कि वे किस दिशा में हैं!"
+    },
+    "countAndCompare": {
+      "title": "गिनो और तुलना करो",
+      "description": "दो समूहों की तुलना करें और देखें कि किसमें ज़्यादा हैं!"
+    },
+    "shadowMatch": {
+      "title": "परछाई मिलाओ",
+      "description": "जानवरों और खिलौनों को उनकी काली परछाई से मिलाएं!"
+    },
+    "oppositeWords": {
+      "title": "विलोम शब्द",
+      "description": "उल्टे अर्थ वाले शब्द पहचानें जैसे बड़ा-छोटा, दिन-रात!"
+    },
+    "rhymingWords": {
+      "title": "समान तुक वाले शब्द",
+      "description": "एक जैसी आवाज़ वाले तुकबंदी शब्द खोजें जैसे रात-बात!"
+    },
+    "actionWords": {
+      "title": "काम वाले शब्द (क्रिया)",
+      "description": "दौड़ना, कूदना, खाना और सोना जैसे क्रिया शब्द सीखें!"
+    },
+    "genderNouns": {
+      "title": "लिंग बदलो",
+      "description": "लड़का-लड़की और राजा-रानी जैसी जोड़ियों को मिलाएं!"
     }
   },
   "alphabetMatching": {
@@ -314,7 +350,44 @@
     "level": "स्तर {{level}}",
     "xpToNextLevel": "अगले स्तर तक {{xp}} XP",
     "nextLevel": "अगला स्तर",
-    "home": "घर"
+    "home": "घर",
+    "quitEarlyBadge": "⏱️ जल्दी समाप्त किया",
+    "quitEarlyPraise": "अच्छा अभ्यास सत्र! 👍",
+    "zeroActivityTitle": "सत्र जल्दी समाप्त हुआ 👋",
+    "zeroActivityNotice": "इस बार कोई प्रश्न हल नहीं किया। जब आप तैयार हों, तब खेलें!",
+    "attempted": "प्रयास किया",
+    "unanswered": "अनुत्तरित",
+    "viewDetailedReport": "विस्तृत रिपोर्ट देखें"
+  },
+  "detailedReport": {
+    "titleSuffix": "रिपोर्ट",
+    "sessionReport": "सत्र रिपोर्ट",
+    "completed": "✅ पूर्ण",
+    "subtitle": "प्रत्येक प्रश्न और पुनः प्रयास का विवरण देखें!",
+    "attempted": "प्रयास किया",
+    "filterAll": "सभी",
+    "filter1stTry": "पहला प्रयास",
+    "filterRetry": "पुनः प्रयास",
+    "filterPractice": "अभ्यास",
+    "filterUnanswered": "अनुत्तरित",
+    "noMistakes": "शानदार! इस श्रेणी में कोई गलती नहीं!",
+    "noQuestions": "इस दृश्य में दिखाने के लिए कोई प्रश्न नहीं है।",
+    "roundLabel": "राउंड",
+    "statusUnanswered": "अनुत्तरित",
+    "statusCorrectAfterRetry": "पुनः प्रयास में सही",
+    "statusFirstTry": "पहली बार में सही",
+    "statusPractice": "अभ्यास आवश्यक",
+    "attemptHistory": "प्रयास इतिहास:",
+    "attempt": "प्रयास",
+    "yourAnswer": "आपका उत्तर:",
+    "notAttempted": "— प्रयास नहीं किया —",
+    "correctAnswer": "सही उत्तर:"
+  },
+  "loginLanguage": {
+    "appLanguageTitle": "ऐप भाषा (इंटरफ़ेस)",
+    "appLanguageSubtitle": "ऐप आपसे किस भाषा में बात करे?",
+    "learningLanguageTitle": "सीखने की भाषा (खेल)",
+    "learningLanguageSubtitle": "आप सभी खेलों में कौन सी भाषा सीखना चाहते हैं?"
   },
   "accessibility": {
     "correctCelebration": "सही उत्तर का जश्न",
@@ -485,7 +558,15 @@
     "howToPlaySubtraction": "1. घटाव के सवाल को देखें।\n2. पहली संख्या से दूसरी संख्या घटाएँ।\n3. सही उत्तर वाले कार्ड पर टैप करें।\n4. 3 सितारे जीतने के लिए सभी 5 राउंड पूरे करें! ⭐",
     "howToPlayBiggerAddition": "1. दो अंकों वाले जोड़ के सवाल को देखें।\n2. इकाई और दहाई को ध्यान से जोड़ें।\n3. सही कुल योग वाले कार्ड पर टैप करें।\n4. 3 सितारे जीतने के लिए सभी 5 राउंड पूरे करें! ⭐",
     "howToPlayMultiplication": "1. गुणा के सवाल को देखें।\n2. पहाड़ों का उपयोग करके गुणा करें।\n3. सही गुणनफल वाले कार्ड पर टैप करें।\n4. 3 सितारे जीतने के लिए सभी 5 राउंड पूरे करें! ⭐",
-    "howToPlayDivision": "1. भाग के सवाल को देखें।\n2. संख्या को बराबर समूहों में बाँटें।\n3. सही भागफल वाले कार्ड पर टैप करें।\n4. 3 सितारे जीतने के लिए सभी 5 राउंड पूरे करें! ⭐"
+    "howToPlayDivision": "1. भाग के सवाल को देखें।\n2. संख्या को बराबर समूहों में बाँटें।\n3. सही भागफल वाले कार्ड पर टैप करें।\n4. 3 सितारे जीतने के लिए सभी 5 राउंड पूरे करें! ⭐",
+    "beginnerAdditionTitle": "गिनो और जोड़ो",
+    "beginnerAdditionHero": "गिनो और जोड़ो साहसिक यात्रा!",
+    "beginnerAdditionDesc": "दोनों तरफ की चीज़ें गिनें और उन्हें जोड़कर उत्तर दें!",
+    "howToPlayBeginnerAddition": "पहले समूह को गिनें, फिर दूसरे को और कुल उत्तर चुनें!",
+    "beginnerSubtractionTitle": "घटाने का खेल",
+    "beginnerSubtractionHero": "घटाने का खेल!",
+    "beginnerSubtractionDesc": "चीज़ों को घटाएं और बताएं कि कितने बचे हैं!",
+    "howToPlayBeginnerSubtraction": "कुल वस्तुओं में से घटी हुई वस्तुएं निकालें और उत्तर चुनें!"
   },
   "aptitudeChallenge": {
     "title": "तर्क और बुद्धि",
@@ -542,7 +623,19 @@
     "mascotSpeech": "क्या आप तैयार हैं? खेलने के लिए शुरू करें पर टैप करें!",
     "highlight5Rounds": "5 त्वरित चुनौतियाँ",
     "highlightStars": "सितारे और XP जीतें",
-    "highlightPraise": "बच्चों के अनुकूल संकेत"
+    "highlightPraise": "बच्चों के अनुकूल संकेत",
+    "directionArrowHero": "तीर की दिशा पहचानो!",
+    "directionArrowDesc": "बायाँ, दायाँ, ऊपर और नीचे की दिशा तीरों से सीखें!",
+    "howToPlayDirectionArrow": "तीर किस दिशा में जा रहा है, देखकर सही उत्तर पर टैप करें!",
+    "directionArrowPrompt": "तीर किस दिशा की ओर इशारा कर रहा है?",
+    "countAndCompareHero": "कम या ज़्यादा मुकाबला!",
+    "countAndCompareDesc": "समूहों की तुलना करें और बताएं कि किसमें ज़्यादा है!",
+    "howToPlayCountAndCompare": "दोनों समूहों को गिनें और उस समूह को चुनें जिसमें ज़्यादा हैं!",
+    "countAndComparePrompt": "किस समूह में ज़्यादा वस्तुएं हैं?",
+    "shadowMatchHero": "परछाई जासूस!",
+    "shadowMatchDesc": "हर तस्वीर को उसकी काली परछाई से मिलाएं!",
+    "howToPlayShadowMatch": "परछाई के आकार को ध्यान से देखें और सही चित्र चुनें!",
+    "shadowMatchPrompt": "इस परछाई से कौन-सी तस्वीर मेल खाती है?"
   },
   "grammarChallenge": {
     "title": "बुनियादी व्याकरण",
@@ -591,7 +684,23 @@
     "mascotSpeech": "क्या आप तैयार हैं? खेलने के लिए शुरू करें पर टैप करें!",
     "highlight5Questions": "5 बाल-सुलभ प्रश्न",
     "highlightStars": "सितारे और व्याकरण XP जीतें",
-    "highlightPraise": "त्वरित प्रतिक्रिया और ऑडियो"
+    "highlightPraise": "त्वरित प्रतिक्रिया और ऑडियो",
+    "oppositeWordsHero": "उलटे शब्द की दुनिया!",
+    "oppositeWordsDesc": "गर्म-ठंडा, बड़ा-छोटा और दिन-रात जैसे विलोम शब्द जोड़ें!",
+    "howToPlayOppositeWords": "शब्द को पढ़ें और उसका ठीक उलटा अर्थ वाला शब्द चुनें!",
+    "oppositeWordsPrompt": "इस शब्द का विलोम शब्द चुनें!",
+    "rhymingWordsHero": "तुकबंदी का मज़ा!",
+    "rhymingWordsDesc": "समान तुक वाले शब्द ढूंढें जैसे रात-बात और पानी-नानी!",
+    "howToPlayRhymingWords": "शब्द को बोलकर देखें और समान तुक वाला शब्द चुनें!",
+    "rhymingWordsPrompt": "इसके साथ समान तुक वाला शब्द कौन-सा है?",
+    "actionWordsHero": "क्रिया के साथी!",
+    "actionWordsDesc": "पहचानें कि क्या काम हो रहा है: दौड़ना, कूदना या खाना!",
+    "howToPlayActionWords": "चित्र को देखें और सही काम (क्रिया) वाले शब्द पर टैप करें!",
+    "actionWordsPrompt": "यहाँ कौन-सा काम (क्रिया) हो रहा है?",
+    "genderNounsHero": "लिंग बदलो!",
+    "genderNounsDesc": "लड़का-लड़की और राजा-रानी जैसी जोड़ियां बनाएं!",
+    "howToPlayGenderNouns": "शब्द को पढ़ें और उसका सही लिंग साथी चुनें!",
+    "genderNounsPrompt": "सही जोड़ी (पुल्लिंग / स्त्रीलिंग) चुनें!"
   },
   "missingLetters": {
     "title": "छूटे हुए अक्षर 🔤",

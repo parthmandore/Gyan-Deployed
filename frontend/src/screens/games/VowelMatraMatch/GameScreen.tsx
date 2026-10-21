@@ -59,7 +59,10 @@ export const GameScreen: React.FC = React.memo(() => {
   const navigation = useNavigation<NavProp>();
 
   // Unified Session Lifecycle
+  const handleEarlyQuitRef = useRef<() => void>(() => {});
+
   const lifecycle = useGameSessionLifecycle({
+    onQuitToReport: () => handleEarlyQuitRef.current(),
     gameId: 'vowel_matra_match',
     screenName: 'VowelMatraMatchGame',
     onQuitModalToggle: (visible) => setShowExitModal(visible),
@@ -251,7 +254,7 @@ export const GameScreen: React.FC = React.memo(() => {
     (vowel: string) => {
       if (interactionLocked) return;
       if (matchedVowels.includes(vowel)) return;
-      speakPhrase(vowel, { language: learningLanguage });
+      speakPhrase(vowel, { language: learningLanguage, cancelPrevious: true });
 
       if (selectedMatra) {
         setInteractionLocked(true);
@@ -270,7 +273,7 @@ export const GameScreen: React.FC = React.memo(() => {
       if (interactionLocked) return;
       const pair = roundPairs.find((p) => p.matraForm === matraForm);
       if (pair && matchedVowels.includes(pair.vowel)) return;
-      speakPhrase(matraForm, { language: learningLanguage });
+      speakPhrase(matraForm, { language: learningLanguage, cancelPrevious: true });
 
       if (selectedVowel) {
         setInteractionLocked(true);
@@ -293,10 +296,42 @@ export const GameScreen: React.FC = React.memo(() => {
     setShowExitModal(true);
   }, []);
 
-  const handleConfirmExit = useCallback(() => {
+  
+  const handleEarlyQuitToReport = useCallback(() => {
+    lifecycle.exitToReport(() => {
+      stopSpeech();
+      audioManager.stopAllGameAudio();
+
+      const finalCorrect = Math.max(0, Math.floor(itemsCorrect));
+      const finalAttempted = Math.max(0, Math.floor(matchedVowels.length || itemsAttempted));
+      const totalLength = SESSION_TOTAL_PAIRS;
+      const accuracy = finalAttempted > 0 ? Math.round((finalCorrect / finalAttempted) * 100) : 0;
+      const starsEarned = finalCorrect >= 3 ? 2 : finalCorrect >= 1 ? 1 : 0;
+      const xpEarned = finalCorrect * 15;
+
+      navigation.navigate('VowelMatraMatchSessionComplete', {
+      sessionId: sessionIdRef.current,
+      starsEarned,
+      xpEarned,
+      itemsCorrect: finalCorrect,
+      sessionLength: totalLength,
+      itemsAttempted: finalAttempted,
+      accuracy,
+      durationSeconds: 60,
+      sessionResults,
+      isAbandoned: true,
+    });
+    });
+  }, [lifecycle, navigation, itemsCorrect, matchedVowels.length]);
+
+  useEffect(() => {
+    handleEarlyQuitRef.current = handleEarlyQuitToReport;
+  }, [handleEarlyQuitToReport]);
+
+  const handleConfirmExit = () => {
     setShowExitModal(false);
-    lifecycle.exitSession('GameCatalog');
-  }, [lifecycle]);
+    handleEarlyQuitToReport();
+  };
 
   if (roundPairs.length === 0) {
     return (

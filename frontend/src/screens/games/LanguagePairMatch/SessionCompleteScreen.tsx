@@ -13,6 +13,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { GameSessionCompleteView } from '../../../components';
+import { navigateToGameCatalog, navigateToChildDashboard } from '../../../navigation/navigationHelpers';
 import { LanguagePairReportModal } from './components/LanguagePairReportModal';
 import { useAppLanguageStore } from '../../../state/appLanguageStore';
 import { useProgressStore } from '../../../state/useProgressStore';
@@ -45,6 +46,8 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
     sessionLength = 10,
     accuracy = 100,
   } = route.params || {};
+  const isAbandoned = ((route.params as any) || {}).isAbandoned === true;
+  const itemsAttempted = ((route.params as any) || {}).itemsAttempted !== undefined ? ((route.params as any) || {}).itemsAttempted : sessionLength;
 
   const hasSubmittedRef = useRef(false);
 
@@ -58,7 +61,9 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
       learningLanguage,
       motherTongue,
       age: selectedAge,
-      itemsAttempted: sessionLength,
+      itemsAttempted: isAbandoned ? itemsAttempted : sessionLength,
+      isAbandoned,
+      completed: !isAbandoned,
       itemsCorrect,
       accuracy,
       starsEarned,
@@ -68,11 +73,13 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   }, [itemsCorrect, sessionLength, accuracy, starsEarned, xpEarned, learningLanguage, motherTongue, selectedAge]);
 
   useEffect(() => {
-    const praiseText = t(
+    if (!isAbandoned) {
+      const praiseText = t(
       'languagePairMatch.sessionCompletePraise',
       'Awesome job! You matched the language pairs!'
     );
     speakPhrase(praiseText, { language: motherTongue });
+    }
 
     const unsubscribe = navigation.addListener('beforeRemove', () => {
       stopSpeech();
@@ -96,13 +103,13 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   const handleBackToCatalog = () => {
     stopSpeech();
     resetSession();
-    navigation.navigate('GameCatalog');
+    navigateToGameCatalog(navigation);
   };
 
   const handleReturnToDashboard = () => {
     stopSpeech();
     resetSession();
-    navigation.navigate('ChildDashboard');
+    navigateToChildDashboard(navigation);
   };
 
   return (
@@ -115,9 +122,11 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         accuracy={accuracy}
         xpEarned={xpEarned}
         onPlayAgain={handlePlayAgain}
+        isAbandoned={isAbandoned}
+        itemsAttempted={itemsAttempted}
         onChooseGame={handleBackToCatalog}
         onReturnToDashboard={handleReturnToDashboard}
-        onViewReport={roundAttempts.length > 0 ? () => setShowReportModal(true) : undefined}
+        onViewReport={() => setShowReportModal(true)}
         bgTheme="evening"
       />
 

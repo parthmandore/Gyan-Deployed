@@ -10,7 +10,9 @@ export type MathOperation =
   | 'subtraction'
   | 'bigger_addition'
   | 'multiplication'
-  | 'division';
+  | 'division'
+  | 'beginner_addition'
+  | 'beginner_subtraction';
 
 export interface MathOption {
   id: string;
@@ -58,5 +60,7 @@ export type MathChallengeStackParamList = {
     sessionLength: number;
     accuracy: number;
     isTimeExpired?: boolean;
-  };
+    isAbandoned?: boolean;
+  itemsAttempted?: number;
+};
 };

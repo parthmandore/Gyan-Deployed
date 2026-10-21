@@ -4,8 +4,9 @@
  * Folder: frontend/src/screens/games/VowelMatraMatch
  */
 
-import React, { useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect } from 'react';
+import { navigateToGameCatalog } from '../../../navigation/navigationHelpers';
+import { View, StyleSheet , BackHandler } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,6 +20,14 @@ type NavProp = NativeStackNavigationProp<VowelMatraMatchStackParamList>;
 export const IntroScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
+  useEffect(() => {
+    const onBackPress = () => {
+      navigateToGameCatalog(navigation);
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [navigation]);
   const resetSession = useVowelMatraMatchStore((s) => s.resetSession);
 
   const handleStart = useCallback(() => {
@@ -27,7 +36,7 @@ export const IntroScreen: React.FC = React.memo(() => {
   }, [resetSession, navigation]);
 
   const handleBack = useCallback(() => {
-    (navigation as any).navigate('GameCatalog');
+    navigateToGameCatalog(navigation);
   }, [navigation]);
 
   return (

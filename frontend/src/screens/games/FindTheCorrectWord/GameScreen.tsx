@@ -85,7 +85,10 @@ export const GameScreen: React.FC = React.memo(() => {
 
   const transitionTimeoutRef = useRef<any>(null);
 
+  const handleEarlyQuitRef = useRef<() => void>(() => {});
+
   const lifecycle = useGameSessionLifecycle({
+    onQuitToReport: () => handleEarlyQuitRef.current(),
     gameId: 'find_the_correct_word',
     sessionId,
     onQuitModalToggle: setShowExitModal,
@@ -318,9 +321,42 @@ export const GameScreen: React.FC = React.memo(() => {
   }, []);
 
   // Early quit handler: clean up and return to catalog
+  
+  const handleEarlyQuitToReport = useCallback(() => {
+    lifecycle.exitToReport(() => {
+      stopSpeech();
+      audioManager.stopAllGameAudio();
+
+      const finalCorrect = Math.max(0, Math.floor(itemsCorrect));
+      const finalAttempted = Math.max(0, Math.floor(roundIndex));
+      const totalLength = rounds.length || TOTAL_FIND_CORRECT_WORD_ROUNDS;
+      const accuracy = finalAttempted > 0 ? Math.round((finalCorrect / finalAttempted) * 100) : 0;
+      const starsEarned = finalCorrect >= 3 ? 2 : finalCorrect >= 1 ? 1 : 0;
+      const xpEarned = finalCorrect * 15;
+
+      navigation.navigate('Games', {
+      screen: 'FindTheCorrectWordSessionComplete' as any,
+      params: {
+        starsEarned,
+        xpEarned,
+        itemsCorrect: finalCorrect,
+        sessionLength: totalLength,
+        itemsAttempted: finalAttempted,
+        accuracy,
+        isTimeExpired: false,
+        isAbandoned: true,
+      },
+    });
+    });
+  }, [lifecycle, navigation, itemsCorrect, roundIndex]);
+
+  useEffect(() => {
+    handleEarlyQuitRef.current = handleEarlyQuitToReport;
+  }, [handleEarlyQuitToReport]);
+
   const handleConfirmExit = () => {
     setShowExitModal(false);
-    lifecycle.exitSession('GameCatalog');
+    handleEarlyQuitToReport();
   };
 
   const containerWidth = Math.min(screenWidth - 32, 420);

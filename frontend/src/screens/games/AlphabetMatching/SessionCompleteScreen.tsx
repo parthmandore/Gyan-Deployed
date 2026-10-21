@@ -17,8 +17,10 @@ import { useSpeechPlaybackStore } from './store/speechPlaybackStore';
 import { AlphabetMatchingStackParamList, GameMode } from './types';
 import { GameSessionCompleteView } from '../../../components';
 import { GameAnalysisReportModal, GameQuestionReportItem } from '../../../components/GameAnalysisReportModal';
+import { buildStandardizedReportItems } from '../../../utils/gameReportAdapter';
 import { useProgressStore } from '../../../state/useProgressStore';
 import { useAppLanguageStore } from '../../../state/appLanguageStore';
+import { navigateToGameCatalog, navigateToChildDashboard } from '../../../navigation/navigationHelpers';
 
 type NavigationProp = NativeStackNavigationProp<
   AlphabetMatchingStackParamList,
@@ -44,8 +46,10 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   const resetSession = useAlphabetMatchingStore((state) => state.resetSession);
   const resetPlaybackState = useSpeechPlaybackStore((state) => state.resetPlaybackState);
 
+  const isAbandoned = routeParams?.isAbandoned === true;
   const itemsCorrect = routeParams?.itemsCorrect !== undefined ? routeParams.itemsCorrect : storeItemsCorrect;
   const sessionLength = routeParams?.sessionLength !== undefined ? routeParams.sessionLength : storeSessionLength;
+  const itemsAttempted = routeParams?.itemsAttempted !== undefined ? routeParams.itemsAttempted : sessionLength;
   const sessionResults = routeParams?.sessionResults || [];
   const rounds = routeParams?.rounds || [];
 
@@ -56,10 +60,23 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   const capturedModeRef = useRef<GameMode>(mode);
   const hasSubmittedRef = useRef(false);
 
-  const accuracyFraction = sessionLength > 0 ? itemsCorrect / sessionLength : 0;
-  const accuracyPercentage = routeParams?.accuracy !== undefined ? Math.round(routeParams.accuracy) : Math.round(accuracyFraction * 100);
-  const starsEarned = routeParams?.starsEarned !== undefined ? routeParams.starsEarned : (accuracyPercentage >= 80 ? 3 : accuracyPercentage >= 50 ? 2 : 1);
-  const xpEarned = routeParams?.xpEarned !== undefined ? routeParams.xpEarned : (itemsCorrect * 15 + (accuracyPercentage === 100 ? 25 : 0) + 20);
+  const effectiveAttempted = isAbandoned ? itemsAttempted : sessionLength;
+  const accuracyFraction = effectiveAttempted > 0 ? itemsCorrect / effectiveAttempted : 0;
+  const accuracyPercentage = routeParams?.accuracy !== undefined
+    ? Math.round(routeParams.accuracy)
+    : Math.round(accuracyFraction * 100);
+
+  const starsEarned = routeParams?.starsEarned !== undefined
+    ? routeParams.starsEarned
+    : isAbandoned
+    ? (itemsCorrect >= 3 ? 2 : itemsCorrect >= 1 ? 1 : 0)
+    : (accuracyPercentage >= 80 ? 3 : accuracyPercentage >= 50 ? 2 : 1);
+
+  const xpEarned = routeParams?.xpEarned !== undefined
+    ? routeParams.xpEarned
+    : isAbandoned
+    ? itemsCorrect * 15
+    : (itemsCorrect * 15 + (accuracyPercentage === 100 ? 25 : 0) + 20);
 
   useEffect(() => {
     if (hasSubmittedRef.current) return;
@@ -71,14 +88,16 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
       learningLanguage,
       motherTongue,
       age: selectedAge,
-      itemsAttempted: sessionLength,
+      itemsAttempted: effectiveAttempted,
       itemsCorrect,
       accuracy: accuracyPercentage,
       starsEarned,
       xpEarned,
       durationSeconds: routeParams?.durationSeconds || 60,
+      isAbandoned,
+      completed: !isAbandoned,
     });
-  }, [itemsCorrect, sessionLength, accuracyPercentage, starsEarned, xpEarned, learningLanguage, motherTongue, selectedAge, routeParams]);
+  }, [itemsCorrect, effectiveAttempted, accuracyPercentage, starsEarned, xpEarned, learningLanguage, motherTongue, selectedAge, routeParams, isAbandoned]);
 
   const handlePlayAgain = useCallback(() => {
     const previousMode = capturedModeRef.current;
@@ -91,28 +110,25 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   const handleChooseGame = useCallback(() => {
     resetSession();
     resetPlaybackState();
-    (navigation as any).navigate('GameCatalog');
+    navigateToGameCatalog(navigation);
   }, [resetSession, resetPlaybackState, navigation]);
 
   const handleReturnToDashboard = useCallback(() => {
     resetSession();
     resetPlaybackState();
-    (navigation as any).navigate('ChildDashboard');
+    navigateToChildDashboard(navigation);
   }, [resetSession, resetPlaybackState, navigation]);
 
-  const reportItems: GameQuestionReportItem[] = (rounds.length > 0 ? rounds : new Array(sessionLength).fill(null)).map((r, i) => {
-    const targetLetter = r?.target_letter || `Letter ${i + 1}`;
-    const isCorrect = sessionResults[i] ? sessionResults[i] === 'correct' : i < itemsCorrect;
-    return {
-      roundNumber: i + 1,
-      questionLabel: `Letter Target: "${targetLetter}"`,
-      userAnswer: isCorrect ? targetLetter : 'Needs practice',
-      correctAnswer: targetLetter,
-      isCorrect,
-      attemptsCount: isCorrect ? 1 : 2,
-      xpEarned: isCorrect ? 15 : 0,
-    };
+  const reportSummary = buildStandardizedReportItems({
+    sessionLength,
+    itemsAttempted,
+    isAbandoned,
+    rounds,
+    sessionResults,
+    getQuestionLabel: (r, i) => `Letter Target: "${r?.target_letter || `Letter ${i + 1}`}"`,
+    getCorrectAnswer: (r) => r?.target_letter || 'Letter',
   });
+  const reportItems = reportSummary.items;
 
   return (
     <View style={styles.container}>
@@ -128,12 +144,23 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         onReturnToDashboard={handleReturnToDashboard}
         onViewReport={() => setShowReportModal(true)}
         bgTheme="hub"
+        isAbandoned={isAbandoned}
+        itemsAttempted={itemsAttempted}
       />
 
       <GameAnalysisReportModal
         visible={showReportModal}
         onClose={() => setShowReportModal(false)}
         gameTitle={t('games.alphabetMatching.title', 'Alphabet Matching')}
+        isAbandoned={isAbandoned}
+        totalQuestions={reportSummary.totalQuestions}
+        questionsAttempted={reportSummary.questionsAttempted}
+        firstTryCorrectCount={reportSummary.firstTryCorrectCount}
+        correctedAfterRetryCount={reportSummary.correctedAfterRetryCount}
+        stillIncorrectCount={reportSummary.stillIncorrectCount}
+        unansweredCount={reportSummary.unansweredCount}
+        accuracy={accuracyPercentage ?? reportSummary.accuracy}
+        xpEarned={xpEarned}
         items={reportItems}
       />
     </View>

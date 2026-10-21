@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { navigateToGameCatalog } from '../../../navigation/navigationHelpers';
 import {
   View,
   Text,
@@ -14,8 +15,7 @@ import {
   StatusBar,
   ScrollView,
   useWindowDimensions,
-  ActivityIndicator,
-} from 'react-native';
+  ActivityIndicator, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -43,6 +43,14 @@ const LANGUAGE_NAMES: Record<LanguageCode, { en: string; native: string; flag: s
 export const IntroScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp>();
+  useEffect(() => {
+    const onBackPress = () => {
+      navigateToGameCatalog(navigation);
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [navigation]);
   const { width: screenWidth } = useWindowDimensions();
 
   const isInitialized = useAppLanguageStore((s) => s.isInitialized);
@@ -92,7 +100,7 @@ export const IntroScreen: React.FC = React.memo(() => {
 
   const handleBackToCatalog = () => {
     stopSpeech();
-    navigation.navigate('GameCatalog');
+    navigateToGameCatalog(navigation);
   };
 
   const handleSwitchLanguage = () => {

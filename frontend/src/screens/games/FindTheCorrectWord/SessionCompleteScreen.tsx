@@ -13,7 +13,9 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { GameSessionCompleteView } from '../../../components';
+import { navigateToGameCatalog, navigateToChildDashboard } from '../../../navigation/navigationHelpers';
 import { GameAnalysisReportModal, GameQuestionReportItem } from '../../../components/GameAnalysisReportModal';
+import { buildStandardizedReportItems } from '../../../utils/gameReportAdapter';
 import { useAppLanguageStore } from '../../../state/appLanguageStore';
 import { useProgressStore } from '../../../state/useProgressStore';
 import { useFindTheCorrectWordStore } from './store/useFindTheCorrectWordStore';
@@ -46,6 +48,8 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
     accuracy = 100,
     isTimeExpired = false,
   } = route.params || {};
+  const isAbandoned = ((route.params as any) || {}).isAbandoned === true;
+  const itemsAttempted = ((route.params as any) || {}).itemsAttempted !== undefined ? ((route.params as any) || {}).itemsAttempted : sessionLength;
 
   const hasSubmittedRef = useRef(false);
 
@@ -59,7 +63,9 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
       learningLanguage,
       motherTongue,
       age: selectedAge,
-      itemsAttempted: sessionLength,
+      itemsAttempted: isAbandoned ? itemsAttempted : sessionLength,
+      isAbandoned,
+      completed: !isAbandoned,
       itemsCorrect,
       accuracy,
       starsEarned,
@@ -69,11 +75,13 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   }, [itemsCorrect, sessionLength, accuracy, starsEarned, xpEarned, learningLanguage, motherTongue, selectedAge]);
 
   useEffect(() => {
-    const praiseText = t(
+    if (!isAbandoned) {
+      const praiseText = t(
       'findTheCorrectWord.sessionCompletePraise',
       'You are a spelling champion! Wonderful job finding the correct words!'
     );
     speakPhrase(praiseText, { language: motherTongue });
+    }
 
     const unsubscribe = navigation.addListener('beforeRemove', () => {
       stopSpeech();
@@ -94,47 +102,24 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   const handleBackToCatalog = () => {
     stopSpeech();
     resetGame();
-    navigation.navigate('GameCatalog' as any);
+    navigateToGameCatalog(navigation);
   };
 
   const handleBackToDashboard = () => {
     stopSpeech();
     resetGame();
-    navigation.navigate('ChildDashboard' as any);
+    navigateToChildDashboard(navigation);
   };
 
   // Formulate comprehensive per-question report items
-  const reportItems: GameQuestionReportItem[] = rounds.map((round) => {
-    const roundAttempts = attempts.filter((a) => a.roundNumber === round.roundNumber);
-    const lastAttempt = roundAttempts[roundAttempts.length - 1];
-
-    if (!lastAttempt) {
-      return {
-        roundNumber: round.roundNumber,
-        questionLabel: `Word: ${round.targetItem.correctWord}`,
-        userAnswer: isTimeExpired ? 'Timed Out ⏱️' : 'Skipped',
-        correctAnswer: round.targetItem.correctWord,
-        isCorrect: false,
-        attemptsCount: 0,
-        xpEarned: 0,
-      };
-    }
-
-    const isSuccess = roundAttempts.some((a) => a.isCorrect);
-    const successfulAttempt = roundAttempts.find((a) => a.isCorrect);
-    const attemptCount = successfulAttempt ? successfulAttempt.attemptCount : (roundAttempts.length as 1 | 2);
-    const xp = isSuccess ? (attemptCount === 1 ? 15 : 10) : 0;
-
-    return {
-      roundNumber: round.roundNumber,
-      questionLabel: `Word: ${round.targetItem.correctWord}`,
-      userAnswer: lastAttempt.chosenWord,
-      correctAnswer: round.targetItem.correctWord,
-      isCorrect: isSuccess,
-      attemptsCount: attemptCount,
-      xpEarned: xp,
-    };
+  const reportSummary = buildStandardizedReportItems({
+    sessionLength,
+    itemsAttempted,
+    isAbandoned,
+    rounds,
+    fallbackLabelPrefix: 'Word Round',
   });
+  const reportItems = reportSummary.items;
 
   return (
     <View style={styles.root}>
@@ -146,9 +131,11 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         accuracy={accuracy}
         xpEarned={xpEarned}
         onPlayAgain={handlePlayAgain}
+        isAbandoned={isAbandoned}
+        itemsAttempted={itemsAttempted}
         onChooseGame={handleBackToCatalog}
         onReturnToDashboard={handleBackToDashboard}
-        onViewReport={reportItems.length > 0 ? () => setShowReportModal(true) : undefined}
+        onViewReport={() => setShowReportModal(true)}
         bgTheme="meadow"
       />
 
@@ -156,6 +143,15 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         visible={showReportModal}
         onClose={() => setShowReportModal(false)}
         gameTitle={t('games.findTheCorrectWord.title', 'Find the Correct Word')}
+        isAbandoned={isAbandoned}
+        totalQuestions={reportSummary.totalQuestions}
+        questionsAttempted={reportSummary.questionsAttempted}
+        firstTryCorrectCount={reportSummary.firstTryCorrectCount}
+        correctedAfterRetryCount={reportSummary.correctedAfterRetryCount}
+        stillIncorrectCount={reportSummary.stillIncorrectCount}
+        unansweredCount={reportSummary.unansweredCount}
+        accuracy={accuracy ?? reportSummary.accuracy}
+        xpEarned={xpEarned}
         items={reportItems}
       />
     </View>

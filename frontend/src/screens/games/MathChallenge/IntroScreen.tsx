@@ -8,14 +8,14 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { navigateToGameCatalog } from '../../../navigation/navigationHelpers';
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
   ScrollView,
-  useWindowDimensions,
-} from 'react-native';
+  useWindowDimensions, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -84,11 +84,35 @@ const OPERATION_METADATA: Record<
     ageBadge: '🏆 Age 7: Division',
     accentColor: '#10B981',
   },
+  beginner_addition: {
+    heroKey: 'mathChallenge.beginnerAdditionHero',
+    descKey: 'mathChallenge.beginnerAdditionDesc',
+    howToPlayKey: 'mathChallenge.howToPlayBeginnerAddition',
+    icon: '➕',
+    ageBadge: '🌱 Age 5: Count & Add',
+    accentColor: '#0EA5E9',
+  },
+  beginner_subtraction: {
+    heroKey: 'mathChallenge.beginnerSubtractionHero',
+    descKey: 'mathChallenge.beginnerSubtractionDesc',
+    howToPlayKey: 'mathChallenge.howToPlayBeginnerSubtraction',
+    icon: '➖',
+    ageBadge: '🌱 Age 5: Take Away',
+    accentColor: '#F43F5E',
+  },
 };
 
 export const IntroScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
+  useEffect(() => {
+    const onBackPress = () => {
+      navigateToGameCatalog(navigation);
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [navigation]);
   const route = useRoute<RouteProps>();
   const { width: screenWidth } = useWindowDimensions();
 
@@ -138,11 +162,7 @@ export const IntroScreen: React.FC = React.memo(() => {
             <BigTouchTarget
               onPress={() => {
                 stopSpeech();
-                if (navigation.canGoBack()) {
-                  navigation.goBack();
-                } else {
-                  (navigation as any).navigate('GameCatalog');
-                }
+                navigateToGameCatalog(navigation);
               }}
               accessibilityLabel="Go back to Games Catalog"
               style={styles.backButton}

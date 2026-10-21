@@ -114,12 +114,7 @@ import {
   OddWordOutSessionComplete as OddWordOutSessionCompleteScreen,
   OddWordOutStackParamList,
 } from '../screens/games/OddWordOut';
-import { GameCatalogScreen } from '../screens/GameCatalogScreen';
 
-export type GamesCatalogStackParamList = {
-  GameCatalog: undefined;
-  GamesCatalog: undefined;
-};
 
 export type GamesStackParamList = AlphabetMatchingStackParamList &
   CapitalSmallMatchStackParamList &
@@ -138,8 +133,7 @@ export type GamesStackParamList = AlphabetMatchingStackParamList &
   GuessTheShapeStackParamList &
   MissingLetterWordsStackParamList &
   FindTheCorrectWordStackParamList &
-  OddWordOutStackParamList &
-  GamesCatalogStackParamList;
+  OddWordOutStackParamList;
 
 const Stack = createNativeStackNavigator<GamesStackParamList>();
 
@@ -398,15 +392,6 @@ export const GamesNavigator: React.FC = () => {
         component={OddWordOutSessionCompleteScreen}
       />
 
-      {/* === Catalog Fallback Navigation === */}
-      <Stack.Screen
-        name="GameCatalog"
-        component={GameCatalogScreen}
-      />
-      <Stack.Screen
-        name="GamesCatalog"
-        component={GameCatalogScreen}
-      />
     </Stack.Navigator>
   );
 };

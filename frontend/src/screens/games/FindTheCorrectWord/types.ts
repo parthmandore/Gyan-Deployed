@@ -44,6 +44,8 @@ export interface FindTheCorrectWordSessionResults {
   sessionLength: number;
   accuracy: number;
   isTimeExpired?: boolean;
+  isAbandoned?: boolean;
+  itemsAttempted?: number;
 }
 
 export type FindTheCorrectWordStackParamList = {

@@ -13,7 +13,9 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { GameSessionCompleteView } from '../../../components';
+import { navigateToGameCatalog, navigateToChildDashboard } from '../../../navigation/navigationHelpers';
 import { GameAnalysisReportModal, GameQuestionReportItem } from '../../../components/GameAnalysisReportModal';
+import { buildStandardizedReportItems } from '../../../utils/gameReportAdapter';
 import { useAppLanguageStore } from '../../../state/appLanguageStore';
 import { useProgressStore } from '../../../state/useProgressStore';
 import { useNumberCountingStore } from './store/useNumberCountingStore';
@@ -46,6 +48,8 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
     xpEarned = 75,
     durationSeconds = 30,
   } = (route.params as any) || {};
+  const isAbandoned = ((route.params as any) || {}).isAbandoned === true;
+  const itemsAttempted = ((route.params as any) || {}).itemsAttempted !== undefined ? ((route.params as any) || {}).itemsAttempted : totalQuestions;
 
   const accuracy = Math.round((correctAnswers / Math.max(totalQuestions, 1)) * 100);
   const starCount = accuracy >= 80 ? 3 : accuracy >= 50 ? 2 : 1;
@@ -62,7 +66,9 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
       learningLanguage,
       motherTongue,
       age: selectedAge,
-      itemsAttempted: totalQuestions,
+      itemsAttempted: isAbandoned ? itemsAttempted : totalQuestions,
+      isAbandoned,
+      completed: !isAbandoned,
       itemsCorrect: correctAnswers,
       accuracy,
       starsEarned: starCount,
@@ -72,11 +78,13 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   }, [correctAnswers, totalQuestions, accuracy, starCount, xpEarned, durationSeconds, learningLanguage, motherTongue, selectedAge]);
 
   useEffect(() => {
-    const praiseText = t(
+    if (!isAbandoned) {
+      const praiseText = t(
       'numberCounting.sessionCompletePraise',
       'You are a counting champion!'
     );
     speakPhrase(praiseText, { language: motherTongue });
+    }
 
     const unsubscribe = navigation.addListener('beforeRemove', () => {
       stopSpeech();
@@ -99,24 +107,23 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   const handleBackToDashboard = () => {
     stopSpeech();
     resetGame();
-    navigation.navigate('ChildDashboard' as any);
+    navigateToChildDashboard(navigation);
   };
 
   const handleBackToCatalog = () => {
     stopSpeech();
     resetGame();
-    navigation.navigate('GameCatalog' as any);
+    navigateToGameCatalog(navigation);
   };
 
-  const reportItems: GameQuestionReportItem[] = attempts.map((att) => ({
-    roundNumber: att.roundIndex + 1,
-    questionLabel: `Round ${att.roundIndex + 1}: Count Objects`,
-    userAnswer: String(att.selectedNumber),
-    correctAnswer: String(att.correctNumber),
-    isCorrect: att.isCorrect,
-    attemptsCount: 1,
-    xpEarned: att.isCorrect ? 15 : 0,
-  }));
+  const reportSummary = buildStandardizedReportItems({
+    sessionLength: totalQuestions,
+    itemsAttempted,
+    isAbandoned,
+    attempts,
+    fallbackLabelPrefix: 'Counting Task',
+  });
+  const reportItems = reportSummary.items;
 
   return (
     <View style={styles.root}>
@@ -128,9 +135,11 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         accuracy={accuracy}
         xpEarned={xpEarned}
         onPlayAgain={handlePlayAgain}
+        isAbandoned={isAbandoned}
+        itemsAttempted={itemsAttempted}
         onChooseGame={handleBackToCatalog}
         onReturnToDashboard={handleBackToDashboard}
-        onViewReport={reportItems.length > 0 ? () => setShowReportModal(true) : undefined}
+        onViewReport={() => setShowReportModal(true)}
         bgTheme="math"
       />
 
@@ -138,6 +147,15 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         visible={showReportModal}
         onClose={() => setShowReportModal(false)}
         gameTitle={t('games.numberCounting.title', 'Number Counting')}
+        isAbandoned={isAbandoned}
+        totalQuestions={reportSummary.totalQuestions}
+        questionsAttempted={reportSummary.questionsAttempted}
+        firstTryCorrectCount={reportSummary.firstTryCorrectCount}
+        correctedAfterRetryCount={reportSummary.correctedAfterRetryCount}
+        stillIncorrectCount={reportSummary.stillIncorrectCount}
+        unansweredCount={reportSummary.unansweredCount}
+        accuracy={accuracy ?? reportSummary.accuracy}
+        xpEarned={xpEarned}
         items={reportItems}
       />
     </View>

@@ -91,7 +91,10 @@ export const GameScreen: React.FC = React.memo(() => {
 
   const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const handleEarlyQuitRef = useRef<() => void>(() => {});
+
   const lifecycle = useGameSessionLifecycle({
+    onQuitToReport: () => handleEarlyQuitRef.current(),
     gameId: `aptitude_${gameType}`,
     sessionId,
     onQuitModalToggle: setShowExitModal,
@@ -356,9 +359,43 @@ export const GameScreen: React.FC = React.memo(() => {
     speakPhrase(prompt, { language: motherTongue });
   };
 
+  
+  const handleEarlyQuitToReport = useCallback(() => {
+    lifecycle.exitToReport(() => {
+      stopSpeech();
+      audioManager.stopAllGameAudio();
+
+      const finalCorrect = Math.max(0, Math.floor(itemsCorrect));
+      const finalAttempted = Math.max(0, Math.floor(roundIndex));
+      const totalLength = TOTAL_APTITUDE_ROUNDS;
+      const accuracy = finalAttempted > 0 ? Math.round((finalCorrect / finalAttempted) * 100) : 0;
+      const starsEarned = finalCorrect >= 3 ? 2 : finalCorrect >= 1 ? 1 : 0;
+      const xpEarned = finalCorrect * 15;
+
+      navigation.navigate('Games', {
+      screen: 'AptitudeChallengeSessionComplete' as any,
+      params: {
+        gameType,
+        starsEarned,
+        xpEarned,
+        itemsCorrect: finalCorrect,
+        sessionLength: totalLength,
+        itemsAttempted: finalAttempted,
+        accuracy,
+        isTimeExpired: false,
+        isAbandoned: true,
+      },
+    });
+    });
+  }, [lifecycle, navigation, itemsCorrect, roundIndex]);
+
+  useEffect(() => {
+    handleEarlyQuitRef.current = handleEarlyQuitToReport;
+  }, [handleEarlyQuitToReport]);
+
   const handleConfirmExit = () => {
     setShowExitModal(false);
-    lifecycle.exitSession('GameCatalog');
+    handleEarlyQuitToReport();
   };
 
   if (!currentRound) {

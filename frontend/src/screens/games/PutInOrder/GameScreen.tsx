@@ -56,7 +56,10 @@ export const GameScreen: React.FC = React.memo(() => {
   const { width: screenWidth } = useWindowDimensions();
 
   // Unified Session Lifecycle
+  const handleEarlyQuitRef = useRef<() => void>(() => {});
+
   const lifecycle = useGameSessionLifecycle({
+    onQuitToReport: () => handleEarlyQuitRef.current(),
     gameId: 'put_in_order',
     screenName: 'PutInOrderGame',
     onQuitModalToggle: (visible) => setShowQuitModal(visible),
@@ -370,9 +373,45 @@ export const GameScreen: React.FC = React.memo(() => {
     };
   }, [navigation]);
 
+  
+  const handleEarlyQuitToReport = useCallback(() => {
+    lifecycle.exitToReport(() => {
+      stopSpeech();
+      audioManager.stopAllGameAudio();
+
+      const finalCorrect = Math.max(0, Math.floor(itemsCorrect));
+      const finalAttempted = Math.max(0, Math.floor(roundIndex));
+      const totalLength = TOTAL_ORDER_ROUNDS;
+      const accuracy = finalAttempted > 0 ? Math.round((finalCorrect / finalAttempted) * 100) : 0;
+      const starsEarned = finalCorrect >= 3 ? 2 : finalCorrect >= 1 ? 1 : 0;
+      const xpEarned = finalCorrect * 15;
+
+      navigation.navigate('Games', {
+      screen: 'PutInOrderSessionComplete' as any,
+      params: {
+        score: finalCorrect * 10,
+        totalQuestions: totalLength,
+        correctAnswers: finalCorrect,
+        itemsCorrect: finalCorrect,
+        sessionLength: totalLength,
+        itemsAttempted: finalAttempted,
+        accuracy,
+        xpEarned,
+        starsEarned,
+        durationSeconds: 60,
+        isAbandoned: true,
+      },
+    });
+    });
+  }, [lifecycle, navigation, itemsCorrect, roundIndex]);
+
+  useEffect(() => {
+    handleEarlyQuitRef.current = handleEarlyQuitToReport;
+  }, [handleEarlyQuitToReport]);
+
   const handleConfirmQuit = () => {
     setShowQuitModal(false);
-    lifecycle.exitSession('GameCatalog');
+    handleEarlyQuitToReport();
   };
 
   const handleCancelQuit = () => {

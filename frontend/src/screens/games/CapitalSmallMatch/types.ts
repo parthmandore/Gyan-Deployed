@@ -85,5 +85,7 @@ export type CapitalSmallMatchStackParamList = {
     accuracy: number;
     durationSeconds: number;
     sessionResults?: Array<'correct' | 'wrong'>;
-  } | undefined;
+    isAbandoned?: boolean;
+  itemsAttempted?: number;
+} | undefined;
 };

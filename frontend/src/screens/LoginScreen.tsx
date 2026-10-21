@@ -19,8 +19,10 @@ import {
   Platform,
   useWindowDimensions,
   Pressable,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Animated, {
@@ -46,18 +48,34 @@ import {
   WorldTypography,
 } from '../theme/tokens';
 import { useAuthStore } from '../state/authStore';
+import { useAppLanguageStore, AppLanguage, LearningLanguage } from '../state/appLanguageStore';
 import { localDatabase } from '../services/localDatabase';
 import { audioManager } from '../services/audioManager';
 import { RootStackParamList } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
+const LANGUAGE_OPTIONS: { code: AppLanguage; label: string; flag: string }[] = [
+  { code: 'en', label: 'English', flag: '🔤' },
+  { code: 'hi', label: 'हिंदी', flag: '🇮🇳' },
+  { code: 'mr', label: 'मराठी', flag: '🚩' },
+];
+
 export const LoginScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp>();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
 
   const login = useAuthStore((s) => s.login);
   const isLoading = useAuthStore((s) => s.isLoading);
+
+  const storeAppLang = useAppLanguageStore((s) => s.appLanguage);
+  const storeLearningLang = useAppLanguageStore((s) => s.learningLanguage);
+  const setAppLanguage = useAppLanguageStore((s) => s.setAppLanguage);
+  const setLearningLanguage = useAppLanguageStore((s) => s.setLearningLanguage);
+
+  const [selectedAppLang, setSelectedAppLang] = useState<AppLanguage>(storeAppLang || 'en');
+  const [selectedLearnLang, setSelectedLearnLang] = useState<LearningLanguage>(storeLearningLang || 'hi');
 
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
@@ -97,6 +115,18 @@ export const LoginScreen: React.FC = () => {
     };
   }, []);
 
+  const handleSelectAppLang = async (lang: AppLanguage) => {
+    audioManager.playTapSound();
+    setSelectedAppLang(lang);
+    await setAppLanguage(lang);
+  };
+
+  const handleSelectLearningLang = async (lang: LearningLanguage) => {
+    audioManager.playTapSound();
+    setSelectedLearnLang(lang);
+    await setLearningLanguage(lang);
+  };
+
   const handleLogin = async () => {
     if (isLoading) return; // Prevent duplicate requests from repeated taps
 
@@ -126,6 +156,9 @@ export const LoginScreen: React.FC = () => {
       const res = await login(cleanUsername, cleanPin);
       if (res.success) {
         audioManager.playCelebrationSound();
+        // Maintain user's chosen languages from login screen
+        await setAppLanguage(selectedAppLang);
+        await setLearningLanguage(selectedLearnLang);
         navigation.reset({
           index: 0,
           routes: [{ name: 'ChildDashboard' }],
@@ -208,6 +241,78 @@ export const LoginScreen: React.FC = () => {
                     <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
                   </View>
                 )}
+
+                {/* Language Question 1: App Interface Language */}
+                <View style={styles.languageQuestionBlock}>
+                  <Text style={styles.languageQuestionTitle}>
+                    🌐 {t('loginLanguage.appLanguageTitle', 'App Language (Interface)')}
+                  </Text>
+                  <Text style={styles.languageQuestionSubtitle}>
+                    {t('loginLanguage.appLanguageSubtitle', 'Which language should the app talk to you in?')}
+                  </Text>
+                  <View style={styles.languageButtonGroup}>
+                    {LANGUAGE_OPTIONS.map((opt) => {
+                      const isSelected = selectedAppLang === opt.code;
+                      return (
+                        <TouchableOpacity
+                          key={`app_${opt.code}`}
+                          onPress={() => handleSelectAppLang(opt.code)}
+                          style={[styles.langChoiceBtn, isSelected && styles.langChoiceBtnSelected]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`App Language ${opt.label}`}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.langChoiceFlag}>{opt.flag}</Text>
+                          <Text
+                            style={[
+                              styles.langChoiceText,
+                              isSelected && styles.langChoiceTextSelected,
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                          {isSelected && <Text style={styles.langChoiceCheck}>✓</Text>}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Language Question 2: Learning Language */}
+                <View style={styles.languageQuestionBlock}>
+                  <Text style={styles.languageQuestionTitle}>
+                    🎯 {t('loginLanguage.learningLanguageTitle', 'Language to Learn (Games)')}
+                  </Text>
+                  <Text style={styles.languageQuestionSubtitle}>
+                    {t('loginLanguage.learningLanguageSubtitle', 'Which language do you want to learn in all games?')}
+                  </Text>
+                  <View style={styles.languageButtonGroup}>
+                    {LANGUAGE_OPTIONS.map((opt) => {
+                      const isSelected = selectedLearnLang === opt.code;
+                      return (
+                        <TouchableOpacity
+                          key={`learn_${opt.code}`}
+                          onPress={() => handleSelectLearningLang(opt.code)}
+                          style={[styles.langChoiceBtn, isSelected && styles.langChoiceBtnSelected]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Learning Language ${opt.label}`}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.langChoiceFlag}>{opt.flag}</Text>
+                          <Text
+                            style={[
+                              styles.langChoiceText,
+                              isSelected && styles.langChoiceTextSelected,
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                          {isSelected && <Text style={styles.langChoiceCheck}>✓</Text>}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
 
                 {/* Field 1: Explorer Username */}
                 <View style={styles.fieldBlock}>
@@ -686,4 +791,67 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#065F46',
   },
+
+  /* Language Selector Questions */
+  languageQuestionBlock: {
+    marginBottom: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: WorldRadii.md,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  languageQuestionTitle: {
+    fontFamily: WorldTypography.fonts.bold,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  languageQuestionSubtitle: {
+    fontFamily: WorldTypography.fonts.regular,
+    fontSize: 11,
+    color: '#64748B',
+    marginBottom: 8,
+  },
+  languageButtonGroup: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  langChoiceBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderRadius: WorldRadii.sm,
+    paddingVertical: 7,
+    paddingHorizontal: 4,
+    gap: 4,
+  },
+  langChoiceBtnSelected: {
+    borderColor: '#4F46E5',
+    backgroundColor: '#EEF2FF',
+  },
+  langChoiceFlag: {
+    fontSize: 14,
+  },
+  langChoiceText: {
+    fontFamily: WorldTypography.fonts.semibold,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  langChoiceTextSelected: {
+    color: '#4F46E5',
+    fontWeight: '700',
+  },
+  langChoiceCheck: {
+    fontSize: 12,
+    color: '#4F46E5',
+    fontWeight: 'bold',
+  },
 });
+

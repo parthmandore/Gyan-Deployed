@@ -51,6 +51,7 @@ import { useAppLanguageStore, AppAge, AppLanguage } from '../state/appLanguageSt
 import { useProgressStore } from '../state/useProgressStore';
 import { RootStackParamList } from '../types';
 import { audioManager } from '../services/audioManager';
+import { navigateToChildDashboard } from '../navigation/navigationHelpers';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'GameCatalog'>;
 
@@ -81,6 +82,7 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
   const selectedLanguage = useAppLanguageStore((s) => s.selectedLanguage) || motherTongue;
   const selectedAge = (useAppLanguageStore((s) => s.selectedAge) || 5) as AppAge;
   const setSelectedLanguage = useAppLanguageStore((s) => s.setSelectedLanguage);
+  const setSelectedAge = useAppLanguageStore((s) => s.setSelectedAge);
 
   const history = useProgressStore((s) => s.history) || [];
   const isNavigatingRef = useRef(false);
@@ -167,16 +169,12 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
     }, 800);
   };
 
-  // Safe Back behavior with stack check and fallback to dashboard
+  // Deterministic Back behavior: GameCatalog Back ALWAYS returns directly to ChildDashboard
   const handleGoBack = useCallback(() => {
     if (isNavigatingRef.current) return;
     isNavigatingRef.current = true;
     audioManager.playTapSound();
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      navigation.navigate('ChildDashboard');
-    }
+    navigateToChildDashboard(navigation);
     setTimeout(() => {
       isNavigatingRef.current = false;
     }, 800);
@@ -212,12 +210,15 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
     return realmGroups.filter((r) => r.key === activeRealmFilter);
   }, [activeRealmFilter, realmGroups]);
 
-  // Responsive grid calculation
-  const containerPadding = screenWidth < 360 ? 16 : 24;
-  const contentWidth = Math.min(screenWidth - containerPadding, 680);
-  const numColumns = contentWidth >= 560 ? 3 : 2;
-  const gridGap = 12;
-  const cardWidth = Math.floor((contentWidth - (numColumns - 1) * gridGap) / numColumns);
+  // Responsive grid calculation:
+  // Mobile portrait (360px-430px) strictly displays 2 columns.
+  // Tablets / wider screens (>= 600px) display 3 columns, and (>= 880px) 4 columns.
+  const maxW = Math.min(screenWidth, 980);
+  const containerPadding = screenWidth < 380 ? 10 : 16;
+  const availableGridWidth = maxW - containerPadding * 2;
+  const numColumns = availableGridWidth >= 880 ? 4 : availableGridWidth >= 600 ? 3 : 2;
+  const gridGap = screenWidth < 380 ? 10 : 12;
+  const cardWidth = Math.floor((availableGridWidth - (numColumns - 1) * gridGap - 2) / numColumns);
   const currentLangLabel = LANGUAGE_LABELS[selectedLanguage] || 'English';
 
   return (
@@ -228,7 +229,7 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="light-content" backgroundColor="#0E7490" />
 
-        <ResponsiveContainer maxWidth="standard" padding="sm">
+        <ResponsiveContainer maxWidth="wide" padding={screenWidth < 380 ? 'xs' : 'sm'}>
           {/* Top Discovery Header Island */}
           <IslandPanel
             variant="frosted"
@@ -236,7 +237,7 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
             style={styles.headerIsland}
             padding="sm"
           >
-            {/* Row 1: Back, Title, Language */}
+            {/* Row 1: Back, Title, Audio & Language */}
             <View style={styles.headerRow}>
               <View style={styles.headerLeftRow}>
                 <BigTouchTarget
@@ -253,7 +254,7 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
                     {t('games.catalogTitle')}
                   </Text>
                   <Text style={styles.headerSubtitleText} numberOfLines={1}>
-                    Age {selectedAge} • {availableGames.length} Quests • {realmGroups.length} Active Realms
+                    {availableGames.length} Quests • {realmGroups.length} Active Realms
                   </Text>
                 </View>
               </View>
@@ -268,6 +269,42 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
                 >
                   <Text style={styles.languageSwitchText}>🌐 {currentLangLabel}</Text>
                 </BigTouchTarget>
+              </View>
+            </View>
+
+            {/* Row 2: Prominent Age Group Selector */}
+            <View style={styles.ageSelectorContainer}>
+              <Text style={styles.ageSelectorLabel}>
+                🎒 {t('settings.ageGroup', 'Age')}:
+              </Text>
+              <View style={styles.agePillsRow}>
+                {([5, 6, 7, 8] as AppAge[]).map((age) => {
+                  const isActive = selectedAge === age;
+                  return (
+                    <BigTouchTarget
+                      key={age}
+                      onPress={() => {
+                        audioManager.playTapSound();
+                        setSelectedAge(age);
+                      }}
+                      accessibilityLabel={`Age ${age}`}
+                      accessibilityRole="button"
+                      style={[
+                        styles.agePill,
+                        isActive && styles.agePillActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.agePillText,
+                          isActive && styles.agePillTextActive,
+                        ]}
+                      >
+                        {age} yrs
+                      </Text>
+                    </BigTouchTarget>
+                  );
+                })}
               </View>
             </View>
           </IslandPanel>
@@ -415,7 +452,7 @@ export const GameCatalogScreen: React.FC = React.memo(() => {
                     </IslandPanel>
 
                     {/* Connected Grid of 3D Game Landmark Cards */}
-                    <View style={styles.gridContainer}>
+                    <View style={[styles.gridContainer, { gap: gridGap }]}>
                       {realm.games.map((game) => {
                         const title = t(game.titleKey);
                         const description = t(game.descriptionKey);
@@ -657,8 +694,11 @@ const styles = StyleSheet.create({
   realmFilterPill: {
     borderRadius: WorldRadii.pill,
     borderWidth: 1.5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    minHeight: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   realmFilterPillActiveAll: {
     backgroundColor: '#0F172A',
@@ -666,7 +706,7 @@ const styles = StyleSheet.create({
   },
   realmFilterPillText: {
     fontFamily: WorldTypography.fonts.bold,
-    fontSize: 11,
+    fontSize: 13,
     color: WorldPalettes.text.primary,
   },
   realmFilterPillTextActive: {
@@ -735,11 +775,12 @@ const styles = StyleSheet.create({
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
   },
   gameCard: {
-    height: 242,
-    borderRadius: WorldRadii.island,
+    minHeight: 236,
+    borderRadius: 20,
     borderWidth: 2,
     borderBottomWidth: 5,
     padding: 10,
@@ -747,6 +788,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     position: 'relative',
     overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
   cardHighlight: {
     position: 'absolute',
@@ -851,17 +897,21 @@ const styles = StyleSheet.create({
   playButtonPill: {
     backgroundColor: '#FFFFFF',
     borderRadius: WorldRadii.pill,
-    paddingVertical: 5,
-    paddingHorizontal: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    minHeight: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
     shadowRadius: 2,
+    elevation: 2,
   },
   playButtonText: {
     fontFamily: WorldTypography.fonts.bold,
-    fontSize: 11,
-    color: WorldPalettes.text.primary,
+    fontSize: 12,
+    color: '#0F172A',
   },
   emptyIsland: {
     marginTop: 40,

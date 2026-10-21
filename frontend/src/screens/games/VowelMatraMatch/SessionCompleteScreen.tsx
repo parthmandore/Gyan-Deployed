@@ -16,7 +16,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useVowelMatraMatchStore } from './store/vowelMatraMatchStore';
 import { VowelMatraMatchStackParamList } from './types';
 import { GameSessionCompleteView } from '../../../components';
+import { navigateToGameCatalog, navigateToChildDashboard } from '../../../navigation/navigationHelpers';
 import { GameAnalysisReportModal, GameQuestionReportItem } from '../../../components/GameAnalysisReportModal';
+import { buildStandardizedReportItems } from '../../../utils/gameReportAdapter';
 import { useProgressStore } from '../../../state/useProgressStore';
 import { useAppLanguageStore } from '../../../state/appLanguageStore';
 
@@ -50,6 +52,9 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
     sessionResults = [],
   } = routeParams;
 
+  const isAbandoned = (routeParams as any)?.isAbandoned === true;
+  const itemsAttempted = (routeParams as any)?.itemsAttempted !== undefined ? (routeParams as any).itemsAttempted : sessionLength;
+
   const finalXpEarned = xpEarned && xpEarned > 0 ? xpEarned : itemsCorrect * 10;
   const resetSession = useVowelMatraMatchStore((s) => s.resetSession);
 
@@ -69,7 +74,9 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
       learningLanguage,
       motherTongue,
       age: selectedAge,
-      itemsAttempted: sessionLength,
+      itemsAttempted: isAbandoned ? itemsAttempted : sessionLength,
+      isAbandoned,
+      completed: !isAbandoned,
       itemsCorrect,
       accuracy,
       starsEarned,
@@ -85,29 +92,22 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
 
   const handleChooseGame = useCallback(() => {
     resetSession();
-    (navigation as any).navigate('GameCatalog');
+    navigateToGameCatalog(navigation);
   }, [resetSession, navigation]);
 
   const handleReturnToDashboard = useCallback(() => {
     resetSession();
-    (navigation as any).navigate('ChildDashboard');
+    navigateToChildDashboard(navigation);
   }, [resetSession, navigation]);
 
-  const reportItems: GameQuestionReportItem[] = (sessionResults.length > 0
-    ? sessionResults
-    : new Array(sessionLength).fill('correct')
-  ).map((res, idx) => {
-    const isCorrect = res === 'correct';
-    return {
-      roundNumber: idx + 1,
-      questionLabel: `Vowel & Matra Pair ${idx + 1}`,
-      userAnswer: isCorrect ? 'Matched correctly' : 'Needs practice',
-      correctAnswer: 'Correct Match',
-      isCorrect,
-      attemptsCount: isCorrect ? 1 : 2,
-      xpEarned: isCorrect ? 10 : 0,
-    };
+  const reportSummary = buildStandardizedReportItems({
+    sessionLength,
+    itemsAttempted,
+    isAbandoned,
+    sessionResults,
+    fallbackLabelPrefix: 'Vowel & Matra Pair',
   });
+  const reportItems = reportSummary.items;
 
   return (
     <View style={styles.container}>
@@ -120,6 +120,8 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         xpEarned={finalXpEarned}
         sessionResults={sessionResults}
         onPlayAgain={handlePlayAgain}
+        isAbandoned={isAbandoned}
+        itemsAttempted={itemsAttempted}
         onChooseGame={handleChooseGame}
         onReturnToDashboard={handleReturnToDashboard}
         onViewReport={() => setShowReportModal(true)}
@@ -130,6 +132,15 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         visible={showReportModal}
         onClose={() => setShowReportModal(false)}
         gameTitle={t('games.vowelMatraMatch.title', 'Vowel & Matra Match')}
+        isAbandoned={isAbandoned}
+        totalQuestions={reportSummary.totalQuestions}
+        questionsAttempted={reportSummary.questionsAttempted}
+        firstTryCorrectCount={reportSummary.firstTryCorrectCount}
+        correctedAfterRetryCount={reportSummary.correctedAfterRetryCount}
+        stillIncorrectCount={reportSummary.stillIncorrectCount}
+        unansweredCount={reportSummary.unansweredCount}
+        accuracy={accuracy ?? reportSummary.accuracy}
+        xpEarned={xpEarned}
         items={reportItems}
       />
     </View>

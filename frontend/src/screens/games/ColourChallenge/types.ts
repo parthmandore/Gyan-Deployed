@@ -62,5 +62,7 @@ export type ColourChallengeStackParamList = {
     sessionLength: number;
     accuracy: number;
     isTimeExpired?: boolean;
-  };
+    isAbandoned?: boolean;
+  itemsAttempted?: number;
+};
 };

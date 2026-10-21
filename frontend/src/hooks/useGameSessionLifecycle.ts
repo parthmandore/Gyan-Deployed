@@ -11,8 +11,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { BackHandler } from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
-import { stopSpeech } from '../services/speechService';
+import {
+  stopSpeech,
+  registerActiveGameSession,
+  abandonGameSession,
+  speakPhrase,
+  speakLetter,
+  speakWord,
+  PlaybackResult,
+} from '../services/speechService';
 import { audioManager } from '../services/audioManager';
+import { speakPraise } from '../services/praiseService';
 
 export type SessionLifecycleStatus = 'active' | 'completed' | 'abandoned';
 
@@ -23,18 +32,27 @@ export interface UseGameSessionLifecycleOptions {
   onQuitModalToggle?: (visible: boolean) => void;
   onCleanup?: () => void;
   defaultExitDestination?: string;
+  onQuitToReport?: () => void;
 }
 
 export function useGameSessionLifecycle(options: UseGameSessionLifecycleOptions) {
   const {
+    sessionId: userSessionId,
     gameId,
     onQuitModalToggle,
     onCleanup,
     defaultExitDestination = 'GameCatalog',
+    onQuitToReport,
   } = options;
 
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
+
+  // Unique session identifier for speech scoping and lifecycle tracking
+  const sessionIdRef = useRef<string>(
+    userSessionId || `session_${gameId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+  );
+  const sessionId = sessionIdRef.current;
 
   const [status, setStatus] = useState<SessionLifecycleStatus>('active');
   const statusRef = useRef<SessionLifecycleStatus>('active');
@@ -87,19 +105,80 @@ export function useGameSessionLifecycle(options: UseGameSessionLifecycleOptions)
 
   /**
    * Safe exit/abandon handler:
-   * 1. Marks session as 'abandoned'
-   * 2. Clears all pending timeouts/intervals
-   * 3. Stops speech and game audio
+   * 1. Marks session as 'abandoned' synchronously
+   * 2. Clears speech session and stops audio immediately
+   * 3. Clears all pending timeouts/intervals
    * 4. Invokes custom game cleanup if provided
    * 5. Navigates to catalog or target destination
    * 6. Ensures results/report screen cannot be shown later
    */
-  const exitSession = useCallback(
-    (destination?: string) => {
+  /**
+   * Safe exit-to-report handler:
+   * 1. Marks session as 'abandoned' synchronously
+   * 2. Clears speech session and stops audio immediately
+   * 3. Clears all pending timeouts/intervals
+   * 4. Invokes custom game cleanup if provided
+   * 5. Executes report transition callback
+   */
+  const exitToReport = useCallback(
+    (showReportFn?: () => void) => {
       if (statusRef.current === 'abandoned') return;
       statusRef.current = 'abandoned';
       setStatus('abandoned');
 
+      // Invalidate speech for this session immediately
+      abandonGameSession(sessionIdRef.current);
+      clearAllTimers();
+      stopSpeech();
+      audioManager.stopAllGameAudio();
+
+      const fn = showReportFn || onQuitToReport;
+      if (fn) {
+        try {
+          fn();
+        } catch (err) {
+          console.warn(`[useGameSessionLifecycle] Error executing onQuitToReport in ${gameId}:`, err);
+        }
+      } else {
+        // Fallback to catalog if no report handler available
+        try {
+          const parent = navigation.getParent();
+          if (parent) {
+            parent.navigate('GameCatalog' as any);
+          } else {
+            navigation.navigate('GameCatalog' as any);
+          }
+        } catch {
+          navigation.navigate('GameCatalog' as any);
+        }
+      }
+    },
+    [clearAllTimers, gameId, navigation, onCleanup, onQuitToReport]
+  );
+
+  /**
+   * Safe exit/abandon handler:
+   * 1. If onQuitToReport is provided and exiting to catalog, delegates to exitToReport
+   * 2. Marks session as 'abandoned' synchronously
+   * 3. Clears speech session and stops audio immediately
+   * 4. Clears all pending timeouts/intervals
+   * 5. Invokes custom game cleanup if provided
+   * 6. Navigates to catalog or target destination
+   * 7. Ensures results/report screen cannot be shown later
+   */
+  const exitSession = useCallback(
+    (destination?: string) => {
+      if (onQuitToReport && (!destination || destination === 'GameCatalog')) {
+        exitToReport();
+        return;
+      }
+
+      if (statusRef.current === 'abandoned') return;
+      statusRef.current = 'abandoned';
+      setStatus('abandoned');
+
+      // Invalidate speech for this session immediately
+      abandonGameSession(sessionIdRef.current);
       clearAllTimers();
       stopSpeech();
       audioManager.stopAllGameAudio();
@@ -113,9 +192,18 @@ export function useGameSessionLifecycle(options: UseGameSessionLifecycleOptions)
       }
 
       const dest = destination || defaultExitDestination;
-      navigation.navigate(dest as any);
+      try {
+        const parent = navigation.getParent();
+        if (parent) {
+          parent.navigate(dest as any);
+        } else {
+          navigation.navigate(dest as any);
+        }
+      } catch {
+        navigation.navigate(dest as any);
+      }
     },
-    [clearAllTimers, defaultExitDestination, gameId, navigation, onCleanup]
+    [clearAllTimers, defaultExitDestination, exitToReport, gameId, navigation, onCleanup, onQuitToReport]
   );
 
   /**
@@ -128,6 +216,7 @@ export function useGameSessionLifecycle(options: UseGameSessionLifecycleOptions)
   const completeSession = useCallback(
     async (onCompleteAction: () => Promise<void> | void) => {
       if (statusRef.current !== 'active' || isCompletingRef.current) {
+        console.log(`[useGameSessionLifecycle] Skipping completeSession: status is ${statusRef.current}`);
         return;
       }
       isCompletingRef.current = true;
@@ -146,7 +235,84 @@ export function useGameSessionLifecycle(options: UseGameSessionLifecycleOptions)
     [clearAllTimers, gameId]
   );
 
-  // Synchronize Android hardware Back button with Quit modal
+  /**
+   * Session-scoped safe speech helpers
+   */
+  const safeSpeakPhrase = useCallback(
+    async (phrase: string, opts?: { cancelPrevious?: boolean; language?: string }): Promise<PlaybackResult> => {
+      if (statusRef.current !== 'active') {
+        return { success: false, source: 'local_tts_fallback', error: 'Session not active' };
+      }
+      return speakPhrase(phrase, { ...opts, sessionId: sessionIdRef.current });
+    },
+    []
+  );
+
+  const safeSpeakLetter = useCallback(
+    async (letter: string, cachedUrl?: string | null, targetLang?: string): Promise<PlaybackResult> => {
+      if (statusRef.current !== 'active') {
+        return { success: false, source: 'local_tts_fallback', error: 'Session not active' };
+      }
+      return speakLetter(letter, cachedUrl, targetLang, sessionIdRef.current);
+    },
+    []
+  );
+
+  const safeSpeakWord = useCallback(
+    async (word: string, language?: string): Promise<PlaybackResult> => {
+      if (statusRef.current !== 'active') {
+        return { success: false, source: 'local_tts_fallback', error: 'Session not active' };
+      }
+      return speakWord(word, language, sessionIdRef.current);
+    },
+    []
+  );
+
+  const safeSpeakPraise = useCallback((overrideLang?: string) => {
+    if (statusRef.current !== 'active') return;
+    speakPraise(overrideLang, sessionIdRef.current);
+  }, []);
+
+  // Register session on mount & handle navigation blur/beforeRemove
+  useEffect(() => {
+    isMountedRef.current = true;
+    registerActiveGameSession(sessionIdRef.current);
+
+    const unsubscribeBeforeRemove = navigation.addListener('beforeRemove', () => {
+      if (statusRef.current === 'active') {
+        statusRef.current = 'abandoned';
+        abandonGameSession(sessionIdRef.current);
+        clearAllTimers();
+        stopSpeech();
+        audioManager.stopAllGameAudio();
+      }
+    });
+
+    const unsubscribeBlur = navigation.addListener('blur', () => {
+      if (statusRef.current === 'active') {
+        statusRef.current = 'abandoned';
+        abandonGameSession(sessionIdRef.current);
+        clearAllTimers();
+        stopSpeech();
+        audioManager.stopAllGameAudio();
+      }
+    });
+
+    return () => {
+      isMountedRef.current = false;
+      if (statusRef.current === 'active') {
+        statusRef.current = 'abandoned';
+        abandonGameSession(sessionIdRef.current);
+      }
+      unsubscribeBeforeRemove();
+      unsubscribeBlur();
+      clearAllTimers();
+      stopSpeech();
+      audioManager.stopAllGameAudio();
+    };
+  }, [clearAllTimers, navigation]);
+
+  // Synchronize Android hardware Back button with Quit modal or direct exit to report
   useEffect(() => {
     const handleHardwareBack = () => {
       if (!isFocused || statusRef.current !== 'active') {
@@ -154,6 +320,10 @@ export function useGameSessionLifecycle(options: UseGameSessionLifecycleOptions)
       }
       if (onQuitModalToggle) {
         onQuitModalToggle(true);
+        return true;
+      }
+      if (onQuitToReport) {
+        exitToReport();
         return true;
       }
       exitSession();
@@ -164,31 +334,24 @@ export function useGameSessionLifecycle(options: UseGameSessionLifecycleOptions)
     return () => {
       backSub.remove();
     };
-  }, [isFocused, onQuitModalToggle, exitSession]);
-
-  // Unmount cleanup
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      if (statusRef.current === 'active') {
-        statusRef.current = 'abandoned';
-      }
-      clearAllTimers();
-      stopSpeech();
-      audioManager.stopAllGameAudio();
-    };
-  }, [clearAllTimers]);
+  }, [isFocused, onQuitModalToggle, exitSession, exitToReport, onQuitToReport]);
 
   return {
+    sessionId,
     status,
     statusRef,
     isExited: status !== 'active',
     isFocused,
+    isSessionActive: () => statusRef.current === 'active',
     safeSetTimeout,
     safeClearTimeout,
     clearAllTimers,
     exitSession,
+    exitToReport,
     completeSession,
+    safeSpeakPhrase,
+    safeSpeakLetter,
+    safeSpeakWord,
+    safeSpeakPraise,
   };
 }

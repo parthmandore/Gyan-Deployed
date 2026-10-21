@@ -59,7 +59,7 @@ function generateDistractors(
     if (distractors.size >= 3) break;
     const candidate = correctAnswer + delta;
     // Subtraction can be 0, all others must be > 0
-    const minVal = operation === 'subtraction' ? 0 : 1;
+    const minVal = (operation === 'subtraction' || operation === 'beginner_subtraction') ? 0 : 1;
     if (candidate >= minVal && candidate !== correctAnswer) {
       distractors.add(candidate);
     }
@@ -164,6 +164,28 @@ function getCandidateForRound(
         pool = [[36, 6], [40, 5], [42, 6], [45, 5], [48, 6], [32, 8]];
       }
       break;
+
+    case 'beginner_addition':
+      symbol = '+';
+      if (roundNum <= 2) {
+        pool = [[1, 1], [1, 2], [2, 1], [1, 3], [2, 2], [3, 1]];
+      } else if (roundNum <= 4) {
+        pool = [[2, 3], [3, 2], [1, 4], [4, 1], [3, 3], [2, 4]];
+      } else {
+        pool = [[4, 2], [5, 1], [3, 4], [4, 3], [5, 2], [5, 3], [4, 4]];
+      }
+      break;
+
+    case 'beginner_subtraction':
+      symbol = '-';
+      if (roundNum <= 2) {
+        pool = [[2, 1], [3, 1], [3, 2], [4, 1]];
+      } else if (roundNum <= 4) {
+        pool = [[4, 2], [4, 3], [5, 1], [5, 2]];
+      } else {
+        pool = [[5, 3], [5, 4], [6, 2], [6, 3], [6, 1]];
+      }
+      break;
   }
 
   // Find unused candidate from pool
@@ -181,9 +203,9 @@ function getCandidateForRound(
 
   const [op1, op2] = selected;
   let correctAnswer = 0;
-  if (operation === 'addition' || operation === 'bigger_addition') {
+  if (operation === 'addition' || operation === 'bigger_addition' || operation === 'beginner_addition') {
     correctAnswer = op1 + op2;
-  } else if (operation === 'subtraction') {
+  } else if (operation === 'subtraction' || operation === 'beginner_subtraction') {
     correctAnswer = op1 - op2;
   } else if (operation === 'multiplication') {
     correctAnswer = op1 * op2;

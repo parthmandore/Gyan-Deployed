@@ -181,7 +181,10 @@ export const GameScreen: React.FC = React.memo(() => {
     }
   }, [roundPairs.length, setRound, sessionStartTime, setSessionStartTime]);
 
+  const handleEarlyQuitRef = useRef<() => void>(() => {});
+
   const lifecycle = useGameSessionLifecycle({
+    onQuitToReport: () => handleEarlyQuitRef.current(),
     gameId: 'capital_small_match',
     sessionId: sessionIdRef.current,
     onQuitModalToggle: setShowExitModal,
@@ -500,10 +503,42 @@ export const GameScreen: React.FC = React.memo(() => {
     setShowExitModal(true);
   }, []);
 
-  const handleConfirmExit = useCallback(() => {
+  
+  const handleEarlyQuitToReport = useCallback(() => {
+    lifecycle.exitToReport(() => {
+      stopSpeech();
+      audioManager.stopAllGameAudio();
+
+      const finalCorrect = Math.max(0, Math.floor(itemsCorrect));
+      const finalAttempted = Math.max(0, Math.floor(matchedPairs.length || itemsAttempted));
+      const totalLength = SESSION_TOTAL_PAIRS;
+      const accuracy = finalAttempted > 0 ? Math.round((finalCorrect / finalAttempted) * 100) : 0;
+      const starsEarned = finalCorrect >= 3 ? 2 : finalCorrect >= 1 ? 1 : 0;
+      const xpEarned = finalCorrect * 15;
+
+      navigation.navigate('CapitalSmallMatchSessionComplete', {
+      sessionId: sessionIdRef.current,
+      starsEarned,
+      xpEarned,
+      itemsCorrect: finalCorrect,
+      sessionLength: totalLength,
+      itemsAttempted: finalAttempted,
+      accuracy,
+      durationSeconds: 60,
+      sessionResults,
+      isAbandoned: true,
+    });
+    });
+  }, [lifecycle, navigation, itemsCorrect, matchedPairs.length]);
+
+  useEffect(() => {
+    handleEarlyQuitRef.current = handleEarlyQuitToReport;
+  }, [handleEarlyQuitToReport]);
+
+  const handleConfirmExit = () => {
     setShowExitModal(false);
-    lifecycle.exitSession('GameCatalog');
-  }, [lifecycle]);
+    handleEarlyQuitToReport();
+  };
 
   if (roundPairs.length === 0) {
     return (

@@ -53,10 +53,16 @@ export const GameScreen: React.FC = React.memo(() => {
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
 
   // Unified Session Lifecycle
+  const handleEarlyQuitRef = useRef<() => void>(() => {});
+
   const lifecycle = useGameSessionLifecycle({
+    onQuitToReport: () => handleEarlyQuitRef.current(),
     gameId: 'letter_tracing',
     screenName: 'LetterTracingGame',
     onQuitModalToggle: (visible) => setShowExitModal(visible),
+    onCleanup: () => {
+      useLetterTracingStore.getState().resetSession();
+    },
   });
 
   const motherTongue = useAppLanguageStore((s) => s.motherTongue) || 'en';
@@ -84,7 +90,6 @@ export const GameScreen: React.FC = React.memo(() => {
   const [showCelebration, setShowCelebration] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [sessionId] = useState(() => `trace_${Date.now()}`);
   const [attemptNum, setAttemptNum] = useState<1 | 2>(1);
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
   const isSessionFinishedRef = useRef(false);
@@ -96,28 +101,19 @@ export const GameScreen: React.FC = React.memo(() => {
   useEffect(() => {
     const newRounds = generateTracingRounds(selectedAge, learningLanguage);
     startSession(newRounds);
-
-    const unsubscribe = navigation.addListener('beforeRemove', () => {
-      stopSpeech();
-    });
-
-    return () => {
-      stopSpeech();
-      unsubscribe();
-    };
-  }, [selectedAge, learningLanguage, startSession, navigation]);
+  }, [selectedAge, learningLanguage, startSession]);
 
   const currentRound: LetterRound | undefined = rounds[roundIndex];
 
   // Speak letter pronunciation on round load
   useEffect(() => {
-    if (currentRound) {
+    if (currentRound && lifecycle.isSessionActive()) {
       setFeedbackMessage(null);
       setAttemptNum(1);
       setShowCorrectionModal(false);
-      speakPhrase(currentRound.letter.displayChar, { language: learningLanguage });
+      lifecycle.safeSpeakPhrase(currentRound.letter.displayChar, { language: learningLanguage });
     }
-  }, [currentRound, learningLanguage, roundIndex]);
+  }, [currentRound, learningLanguage, roundIndex, lifecycle]);
 
   const handleCanvasLayout = useCallback((w: number, h: number) => {
     canvasWidthRef.current = w;
@@ -126,8 +122,8 @@ export const GameScreen: React.FC = React.memo(() => {
   }, []);
 
   const handleHearLetter = () => {
-    if (currentRound) {
-      speakPhrase(currentRound.letter.displayChar, { language: learningLanguage });
+    if (currentRound && lifecycle.isSessionActive()) {
+      lifecycle.safeSpeakPhrase(currentRound.letter.displayChar, { language: learningLanguage });
     }
   };
 
@@ -141,7 +137,7 @@ export const GameScreen: React.FC = React.memo(() => {
         const accuracy = Math.round((finalCorrectCount / TOTAL_TRACING_ROUNDS) * 100);
 
         const xpResult = await xpService.recordSessionCompletionXP({
-          sessionId,
+          sessionId: lifecycle.sessionId,
           gameId: 'letter_tracing',
           age: selectedAge,
           motherTongue,
@@ -165,7 +161,7 @@ export const GameScreen: React.FC = React.memo(() => {
         });
       });
     },
-    [lifecycle, sessionId, selectedAge, motherTongue, learningLanguage, sessionStartTime, navigation]
+    [lifecycle, selectedAge, motherTongue, learningLanguage, sessionStartTime, navigation]
   );
 
   const handleTimeExpired = useCallback(() => {
@@ -194,7 +190,7 @@ export const GameScreen: React.FC = React.memo(() => {
 
       // Award XP via centralized xpService (15 XP for try 1, 10 XP for retry)
       await xpService.recordAnswerXP({
-        sessionId,
+        sessionId: lifecycle.sessionId,
         roundIndex,
         attemptNum,
         isCorrect: true,
@@ -209,7 +205,7 @@ export const GameScreen: React.FC = React.memo(() => {
         isSuccess: true,
       });
 
-      speakPraise(learningLanguage);
+      lifecycle.safeSpeakPraise(learningLanguage);
 
       const finalCorrectCount = itemsCorrect + 1;
 
@@ -248,7 +244,7 @@ export const GameScreen: React.FC = React.memo(() => {
         });
 
         await xpService.recordAnswerXP({
-          sessionId,
+          sessionId: lifecycle.sessionId,
           roundIndex,
           attemptNum: 2,
           isCorrect: false,
@@ -266,9 +262,42 @@ export const GameScreen: React.FC = React.memo(() => {
     }
   };
 
+  
+  const handleEarlyQuitToReport = useCallback(() => {
+    lifecycle.exitToReport(() => {
+      stopSpeech();
+      audioManager.stopAllGameAudio();
+
+      const finalCorrect = Math.max(0, Math.floor(itemsCorrect));
+      const finalAttempted = Math.max(0, Math.floor(roundIndex));
+      const totalLength = TOTAL_TRACING_ROUNDS;
+      const accuracy = finalAttempted > 0 ? Math.round((finalCorrect / finalAttempted) * 100) : 0;
+      const starsEarned = finalCorrect >= 3 ? 2 : finalCorrect >= 1 ? 1 : 0;
+      const xpEarned = finalCorrect * 15;
+
+      navigation.navigate('Games', {
+      screen: 'LetterTracingSessionComplete' as any,
+      params: {
+        starsEarned,
+        xpEarned,
+        itemsCorrect: finalCorrect,
+        sessionLength: totalLength,
+        itemsAttempted: finalAttempted,
+        accuracy,
+        isTimeExpired: false,
+        isAbandoned: true,
+      },
+    });
+    });
+  }, [lifecycle, navigation, itemsCorrect, roundIndex]);
+
+  useEffect(() => {
+    handleEarlyQuitRef.current = handleEarlyQuitToReport;
+  }, [handleEarlyQuitToReport]);
+
   const handleExitConfirm = () => {
     setShowExitModal(false);
-    lifecycle.exitSession('GameCatalog');
+    handleEarlyQuitToReport();
   };
 
   if (!currentRound) {

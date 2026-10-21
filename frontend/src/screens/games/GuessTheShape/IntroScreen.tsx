@@ -7,14 +7,14 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { navigateToGameCatalog } from '../../../navigation/navigationHelpers';
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
   ScrollView,
-  useWindowDimensions,
-} from 'react-native';
+  useWindowDimensions, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -33,6 +33,14 @@ type NavProp = NativeStackNavigationProp<RootStackParamList, 'Games'>;
 export const IntroScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
+  useEffect(() => {
+    const onBackPress = () => {
+      navigateToGameCatalog(navigation);
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [navigation]);
   const { width: screenWidth } = useWindowDimensions();
 
   const motherTongue = useAppLanguageStore((s) => s.motherTongue) || 'en';
@@ -65,7 +73,7 @@ export const IntroScreen: React.FC = React.memo(() => {
 
   const handleBackToCatalog = () => {
     stopSpeech();
-    navigation.navigate('GameCatalog' as any);
+    navigateToGameCatalog(navigation);
   };
 
   const containerWidth = Math.min(screenWidth - 32, 440);

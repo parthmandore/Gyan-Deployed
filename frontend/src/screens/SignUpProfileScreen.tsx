@@ -46,7 +46,7 @@ import {
   WorldSpacing,
   WorldTypography,
 } from '../theme/tokens';
-import { AppLanguage, AppAge } from '../state/appLanguageStore';
+import { AppLanguage, AppAge, useAppLanguageStore } from '../state/appLanguageStore';
 import { AVATAR_OPTIONS } from '../state/childProfileStore';
 import { useAuthStore } from '../state/authStore';
 import { localDatabase } from '../services/localDatabase';
@@ -83,6 +83,8 @@ export const SignUpProfileScreen: React.FC = () => {
   const [pin, setPin] = useState('');
   const [selectedAge, setSelectedAge] = useState<AppAge>(5);
   const [selectedAppLanguage, setSelectedAppLanguage] = useState<AppLanguage>('en');
+  const [selectedLearningLanguage, setSelectedLearningLanguage] = useState<AppLanguage>('en');
+
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -175,7 +177,7 @@ export const SignUpProfileScreen: React.FC = () => {
         age: selectedAge,
         avatar: selectedAvatar,
         appLanguage: selectedAppLanguage,
-        learningLanguage: selectedAppLanguage,
+        learningLanguage: selectedLearningLanguage,
         motherTongue: selectedAppLanguage,
       });
 
@@ -183,6 +185,8 @@ export const SignUpProfileScreen: React.FC = () => {
 
       if (res.success) {
         audioManager.playCelebrationSound();
+        await useAppLanguageStore.getState().setAppLanguage(selectedAppLanguage);
+        await useAppLanguageStore.getState().setLearningLanguage(selectedLearningLanguage);
         if (Platform.OS === 'web' && typeof document !== 'undefined') {
           try {
             if (document.activeElement instanceof HTMLElement) {
@@ -214,6 +218,12 @@ export const SignUpProfileScreen: React.FC = () => {
     setSelectedAppLanguage(langCode);
     i18n.changeLanguage(langCode);
   };
+
+  const handleSelectLearningLanguage = (langCode: AppLanguage) => {
+    audioManager.playTapSound();
+    setSelectedLearningLanguage(langCode);
+  };
+
 
   return (
     <View style={styles.outerContainer}>
@@ -443,25 +453,62 @@ export const SignUpProfileScreen: React.FC = () => {
                 </View>
               </IslandPanel>
 
-              {/* SECTION 6: Choose Your Language */}
+              {/* SECTION 6: Choose App Language */}
               <IslandPanel variant="frosted" elevation="floating" style={styles.sectionIsland}>
                 <SectionHeader
-                  title={t('onboarding.chooseLanguage')}
+                  title={t('loginLanguage.appLanguageTitle', 'App Language (Interface)')}
                   icon="🌐"
-                  subtitle={t('onboarding.languageSubtitle')}
+                  subtitle={t('loginLanguage.appLanguageSubtitle', 'Which language should the app talk to you in?')}
                 />
                 <View style={styles.languageOptionsList}>
                   {APP_LANGUAGES.map((lang) => {
                     const isSelected = selectedAppLanguage === lang.code;
                     return (
                       <BigTouchTarget
-                        key={lang.code}
+                        key={`app_${lang.code}`}
                         onPress={() => handleSelectLanguage(lang.code)}
                         style={[
                           styles.languagePill,
                           isSelected && styles.languagePillSelected,
                         ]}
-                        accessibilityLabel={`Language: ${lang.name}`}
+                        accessibilityLabel={`App Language: ${lang.name}`}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.langFlag}>{lang.flag}</Text>
+                        <Text
+                          style={[
+                            styles.langText,
+                            isSelected && styles.langTextSelected,
+                          ]}
+                        >
+                          {lang.name}
+                        </Text>
+                        {isSelected && <Text style={styles.checkIcon}>✓</Text>}
+                      </BigTouchTarget>
+                    );
+                  })}
+                </View>
+              </IslandPanel>
+
+              {/* SECTION 7: Choose Language to Learn */}
+              <IslandPanel variant="frosted" elevation="floating" style={styles.sectionIsland}>
+                <SectionHeader
+                  title={t('loginLanguage.learningLanguageTitle', 'Language to Learn (Games)')}
+                  icon="🎯"
+                  subtitle={t('loginLanguage.learningLanguageSubtitle', 'Which language do you want to learn in all games?')}
+                />
+                <View style={styles.languageOptionsList}>
+                  {APP_LANGUAGES.map((lang) => {
+                    const isSelected = selectedLearningLanguage === lang.code;
+                    return (
+                      <BigTouchTarget
+                        key={`learn_${lang.code}`}
+                        onPress={() => handleSelectLearningLanguage(lang.code)}
+                        style={[
+                          styles.languagePill,
+                          isSelected && styles.languagePillSelected,
+                        ]}
+                        accessibilityLabel={`Learning Language: ${lang.name}`}
                         accessibilityRole="button"
                       >
                         <Text style={styles.langFlag}>{lang.flag}</Text>

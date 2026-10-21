@@ -25,6 +25,9 @@ const GAME_THEMES: Record<AptitudeGameType, { color: string; bg: string; badge: 
   odd_one_out: { color: '#DB2777', bg: '#FDF2F8', badge: '🔍 Odd One' },
   logical_sequence: { color: '#0891B2', bg: '#ECFEFF', badge: '⏳ Logic' },
   visual_reasoning: { color: '#4F46E5', bg: '#EEF2FF', badge: '🧠 Reason' },
+  direction_arrow: { color: '#EA580C', bg: '#FFF7ED', badge: '🧭 Direction' },
+  count_and_compare: { color: '#0D9488', bg: '#F0FDFA', badge: '⚖️ Compare' },
+  shadow_match: { color: '#9333EA', bg: '#FAF5FF', badge: '👤 Shadow' },
 };
 
 export const StimulusDisplay: React.FC<StimulusDisplayProps> = React.memo(

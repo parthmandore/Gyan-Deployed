@@ -27,6 +27,10 @@ const TOPIC_BADGES: Record<GrammarTopic, { badge: string; color: string; bg: str
   prepositions: { badge: '📍 Position', color: '#0891B2', bg: '#ECFEFF' },
   basic_tenses: { badge: '⏱️ Time & Tense', color: '#6366F1', bg: '#EEF2FF' },
   sentence_correction: { badge: '✔️ Fix Sentence', color: '#059669', bg: '#F0FDF4' },
+  opposite_words: { badge: '🔄 Opposites', color: '#B45309', bg: '#FEF3C7' },
+  rhyming_words: { badge: '🎵 Rhyme', color: '#BE185D', bg: '#FDF2F8' },
+  action_words: { badge: '🏃 Action', color: '#047857', bg: '#ECFDF5' },
+  gender_nouns: { badge: '👫 Gender', color: '#6D28D9', bg: '#F5F3FF' },
 };
 
 export const GrammarSentenceCard: React.FC<GrammarSentenceCardProps> = React.memo(

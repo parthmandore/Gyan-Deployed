@@ -6,6 +6,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { navigateToGameCatalog } from '../../../navigation/navigationHelpers';
 import {
   View,
   Text,
@@ -13,8 +14,7 @@ import {
   TouchableOpacity,
   ScrollView,
   useWindowDimensions,
-  Modal,
-} from 'react-native';
+  Modal, BackHandler } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +29,14 @@ type NavProp = NativeStackNavigationProp<RootStackParamList>;
 export const IntroScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
+  useEffect(() => {
+    const onBackPress = () => {
+      navigateToGameCatalog(navigation);
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [navigation]);
   const { width: screenWidth } = useWindowDimensions();
 
   const motherTongue = useAppLanguageStore((s) => s.motherTongue) || 'en';
@@ -73,11 +81,7 @@ export const IntroScreen: React.FC = React.memo(() => {
           style={styles.backButton}
           onPress={() => {
             stopSpeech();
-            if (navigation.canGoBack()) {
-              navigation.goBack();
-            } else {
-              (navigation as any).navigate('GameCatalog');
-            }
+            navigateToGameCatalog(navigation);
           }}
           activeOpacity={0.7}
           accessibilityRole="button"

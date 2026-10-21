@@ -22,6 +22,8 @@ const OPERATION_BADGES: Record<MathOperation, { icon: string; color: string; bg:
   bigger_addition: { icon: '➕', color: '#B45309', bg: '#FEF3C7' },
   multiplication: { icon: '✖️', color: '#6D28D9', bg: '#F5F3FF' },
   division: { icon: '➗', color: '#047857', bg: '#ECFDF5' },
+  beginner_addition: { icon: '➕', color: '#0369A1', bg: '#E0F2FE' },
+  beginner_subtraction: { icon: '➖', color: '#BE123C', bg: '#FFE4E6' },
 };
 
 export const EquationCard: React.FC<EquationCardProps> = React.memo(

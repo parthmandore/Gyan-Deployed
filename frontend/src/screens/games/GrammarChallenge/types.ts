@@ -14,7 +14,11 @@ export type GrammarTopic =
   | 'pronouns'
   | 'prepositions'
   | 'basic_tenses'
-  | 'sentence_correction';
+  | 'sentence_correction'
+  | 'opposite_words'
+  | 'rhyming_words'
+  | 'action_words'
+  | 'gender_nouns';
 
 export interface GrammarOption {
   id: string;
@@ -25,7 +29,7 @@ export interface GrammarOption {
 export interface GrammarQuestionItem {
   id: string;
   topic: GrammarTopic;
-  age: 6 | 7;
+  age: 5 | 6 | 7 | 8;
   promptKey?: string;
   promptFallback?: string;
   sentence: string;      // The stimulus sentence (e.g. "The cat ___ running." or "Dog")
@@ -73,5 +77,7 @@ export type GrammarChallengeStackParamList = {
     sessionLength: number;
     accuracy: number;
     isTimeExpired?: boolean;
-  };
+    isAbandoned?: boolean;
+  itemsAttempted?: number;
+};
 };

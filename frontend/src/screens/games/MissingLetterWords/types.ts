@@ -48,6 +48,8 @@ export interface MissingLetterWordsSessionResults {
   sessionLength: number;
   accuracy: number;
   isTimeExpired?: boolean;
+  isAbandoned?: boolean;
+  itemsAttempted?: number;
 }
 
 export type MissingLetterWordsStackParamList = {

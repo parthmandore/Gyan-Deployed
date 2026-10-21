@@ -28,6 +28,8 @@ import { FriendlyModal } from '../../../components/FriendlyModal';
 import { ALL_DATASETS } from './datasets';
 import { stopSpeech } from '../../../services/speechService';
 import { useLearningLanguage } from '../../../language';
+import { navigateToGameCatalog } from '../../../navigation/navigationHelpers';
+import { BackHandler } from 'react-native';
 
 type NavigationProp = NativeStackNavigationProp<
   AlphabetMatchingStackParamList,
@@ -48,7 +50,13 @@ export const ModeSelectionScreen: React.FC = React.memo(() => {
 
   React.useEffect(() => {
     stopSpeech();
-  }, []);
+    const onBackPress = () => {
+      navigateToGameCatalog(navigation);
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [navigation]);
 
   const handleSelectMode = (selectedMode: GameMode) => {
     resetSession();
@@ -70,7 +78,7 @@ export const ModeSelectionScreen: React.FC = React.memo(() => {
         {/* Top Bar Title Header + Back to Catalog & Tutorial Buttons */}
         <View style={styles.headerContainer}>
           <BigTouchTarget
-            onPress={() => (navigation as any).navigate('GameCatalog')}
+            onPress={() => navigateToGameCatalog(navigation)}
             accessibilityLabel={t('common.back')}
             accessibilityRole="button"
             style={styles.backPillButton}

@@ -9,7 +9,7 @@
  * Folder: frontend/src/components
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
   StatusBar,
   ScrollView,
   useWindowDimensions,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -61,6 +62,8 @@ export interface GameSessionCompleteViewProps {
   isLoadingRewards?: boolean;
   bgTheme?: CartoonBackgroundTheme;
   leveledUp?: boolean;
+  isAbandoned?: boolean;
+  itemsAttempted?: number;
 }
 
 export const GameSessionCompleteView: React.FC<GameSessionCompleteViewProps> = React.memo(
@@ -79,6 +82,8 @@ export const GameSessionCompleteView: React.FC<GameSessionCompleteViewProps> = R
     isLoadingRewards = false,
     bgTheme = 'evening',
     leveledUp = false,
+    isAbandoned = false,
+    itemsAttempted,
   }) => {
     const { t } = useTranslation();
     const { width: screenWidth } = useWindowDimensions();
@@ -86,34 +91,37 @@ export const GameSessionCompleteView: React.FC<GameSessionCompleteViewProps> = R
     const totalXp = useProgressStore((s) => s.totalXp);
     const currentLevel = useProgressStore((s) => s.currentLevel);
 
-    const [showCelebration, setShowCelebration] = useState(true);
+    const [showCelebration, setShowCelebration] = useState(!isAbandoned);
     const [showLevelUpModal, setShowLevelUpModal] = useState(false);
 
     useEffect(() => {
-      if (leveledUp) {
+      if (leveledUp && !isAbandoned) {
         const timer = setTimeout(() => {
           setShowLevelUpModal(true);
         }, 1200);
         return () => clearTimeout(timer);
       }
-    }, [leveledUp]);
+    }, [leveledUp, isAbandoned]);
 
     const cardScale = useSharedValue(0.9);
     const cardOpacity = useSharedValue(0);
     const buttonsOpacity = useSharedValue(0);
 
     useEffect(() => {
-      audioManager.playCelebrationSound();
+      if (!isAbandoned) {
+        audioManager.playCelebrationSound();
+      }
       cardOpacity.value = withTiming(1, { duration: 300 });
       cardScale.value = withSpring(1, { damping: 12, stiffness: 180 });
       buttonsOpacity.value = withDelay(250, withTiming(1, { duration: 300 }));
 
-      const timer = setTimeout(() => {
-        setShowCelebration(false);
-      }, 2500);
-
-      return () => clearTimeout(timer);
-    }, [cardOpacity, cardScale, buttonsOpacity]);
+      if (!isAbandoned) {
+        const timer = setTimeout(() => {
+          setShowCelebration(false);
+        }, 2500);
+        return () => clearTimeout(timer);
+      }
+    }, [cardOpacity, cardScale, buttonsOpacity, isAbandoned]);
 
     const cardAnimStyle = useAnimatedStyle(() => ({
       opacity: cardOpacity.value,
@@ -124,30 +132,59 @@ export const GameSessionCompleteView: React.FC<GameSessionCompleteViewProps> = R
       opacity: buttonsOpacity.value,
     }));
 
-    const handlePlayAgainPress = () => {
+    const handlePlayAgainPress = useCallback(() => {
       audioManager.playTapSound();
       onPlayAgain();
-    };
+    }, [onPlayAgain]);
 
-    const handleChooseGamePress = () => {
+    const handleChooseGamePress = useCallback(() => {
       audioManager.playTapSound();
       onChooseGame();
-    };
+    }, [onChooseGame]);
 
-    const handleReturnToDashboardPress = () => {
+    const handleReturnToDashboardPress = useCallback(() => {
       audioManager.playTapSound();
       onReturnToDashboard();
-    };
+    }, [onReturnToDashboard]);
 
-    const starsDisplay =
-      starsEarned >= 3 ? '⭐⭐⭐' : starsEarned === 2 ? '⭐⭐' : '⭐';
+    // Android hardware Back on report safely returns to game catalog
+    useEffect(() => {
+      const onHardwareBack = () => {
+        handleChooseGamePress();
+        return true;
+      };
+      const sub = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
+      return () => sub.remove();
+    }, [handleChooseGamePress]);
 
-    const encouragement =
-      accuracy >= 80 || starsEarned >= 3
-        ? t('sessionComplete.amazingWork', 'Outstanding Work! 🌟')
-        : accuracy >= 50
-        ? t('sessionComplete.greatEffort', 'Great Effort! 🚀')
-        : t('sessionComplete.keepPracticing', 'Keep Exploring! 💡');
+    const attemptedCount =
+      itemsAttempted !== undefined
+        ? itemsAttempted
+        : sessionResults && sessionResults.length > 0
+        ? sessionResults.length
+        : itemsCorrect;
+
+    const isZeroActivity = isAbandoned && attemptedCount === 0;
+
+    const starsDisplay = isAbandoned
+      ? starsEarned > 0
+        ? '⭐'
+        : '🌱'
+      : starsEarned >= 3
+      ? '⭐⭐⭐'
+      : starsEarned === 2
+      ? '⭐⭐'
+      : '⭐';
+
+    const encouragement = isZeroActivity
+      ? t('sessionComplete.zeroActivityTitle', 'Session Ended Early 👋')
+      : isAbandoned
+      ? t('sessionComplete.quitEarlyPraise', 'Good Practice Session! 👍')
+      : accuracy >= 80 || starsEarned >= 3
+      ? t('sessionComplete.amazingWork', 'Outstanding Work! 🌟')
+      : accuracy >= 50
+      ? t('sessionComplete.greatEffort', 'Great Effort! 🚀')
+      : t('sessionComplete.keepPracticing', 'Keep Exploring! 💡');
 
     return (
       <View style={styles.rootContainer}>
@@ -182,6 +219,13 @@ export const GameSessionCompleteView: React.FC<GameSessionCompleteViewProps> = R
 
                 {/* Header Title & Stars */}
                 <View style={styles.headerBox}>
+                  {isAbandoned && (
+                    <View style={styles.quitEarlyBadge}>
+                      <Text style={styles.quitEarlyBadgeText}>
+                        {t('sessionComplete.quitEarlyBadge', '⏱️ Quit Early')}
+                      </Text>
+                    </View>
+                  )}
                   <Text style={styles.starsText}>{starsDisplay}</Text>
                   <Text style={styles.praiseTitle} numberOfLines={1}>
                     {encouragement}
@@ -199,13 +243,22 @@ export const GameSessionCompleteView: React.FC<GameSessionCompleteViewProps> = R
                   padding="md"
                 >
                   {/* Progress Star Trail */}
-                  {sessionResults && sessionResults.length > 0 && (
+                  {sessionResults && sessionResults.length > 0 && !isZeroActivity && (
                     <View style={styles.trailRow}>
                       <ProgressStarTrail
                         current={sessionResults.length}
                         total={sessionLength}
                         roundResults={sessionResults}
                       />
+                    </View>
+                  )}
+
+                  {/* Zero activity notice if player quit before answering anything */}
+                  {isZeroActivity && (
+                    <View style={styles.zeroActivityCard}>
+                      <Text style={styles.zeroActivityNotice}>
+                        {t('sessionComplete.zeroActivityNotice', 'No questions answered this time. Ready when you are!')}
+                      </Text>
                     </View>
                   )}
 
@@ -224,7 +277,7 @@ export const GameSessionCompleteView: React.FC<GameSessionCompleteViewProps> = R
                     {/* Correct Answers */}
                     <View style={styles.metricCell}>
                       <Text style={styles.metricValue}>
-                        {itemsCorrect}/{sessionLength}
+                        {isAbandoned ? `${itemsCorrect}/${attemptedCount}` : `${itemsCorrect}/${sessionLength}`}
                       </Text>
                       <Text style={styles.metricLabel}>
                         {t('common.correct', 'Correct')}
@@ -235,12 +288,21 @@ export const GameSessionCompleteView: React.FC<GameSessionCompleteViewProps> = R
 
                     {/* Accuracy Percentage */}
                     <View style={styles.metricCell}>
-                      <Text style={styles.metricValue}>{accuracy}%</Text>
+                      <Text style={styles.metricValue}>{isZeroActivity ? 0 : accuracy}%</Text>
                       <Text style={styles.metricLabel}>
                         {t('common.accuracy', 'Accuracy')}
                       </Text>
                     </View>
                   </View>
+
+                  {/* For abandoned sessions: show detailed attempt vs unanswered breakdown */}
+                  {isAbandoned && !isZeroActivity && (
+                    <View style={styles.summaryPill}>
+                      <Text style={styles.summaryPillText}>
+                        📊 {attemptedCount}/{sessionLength} {t('sessionComplete.attempted', 'Attempted')} • {itemsCorrect} {t('common.correct', 'Correct')} • {Math.max(0, sessionLength - attemptedCount)} {t('sessionComplete.unanswered', 'Unanswered')}
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Level & Total XP Badge Banner */}
                   <View style={styles.levelBanner}>
@@ -248,21 +310,21 @@ export const GameSessionCompleteView: React.FC<GameSessionCompleteViewProps> = R
                       🏆 Level {currentLevel} • Total {totalXp} XP
                     </Text>
                   </View>
-                </IslandPanel>
 
-                {/* Optional Detailed Report Button */}
-                {onViewReport && (
-                  <BigTouchTarget
-                    onPress={onViewReport}
-                    accessibilityLabel="View Detailed Question Report"
-                    accessibilityRole="button"
-                    style={styles.viewReportButton}
-                  >
-                    <Text style={styles.viewReportButtonText}>
-                      📋 {t('common.viewReport', 'View Detailed Report')}
-                    </Text>
-                  </BigTouchTarget>
-                )}
+                  {/* Prominent Detailed Question Report Button */}
+                  {onViewReport && (
+                    <BigTouchTarget
+                      onPress={onViewReport}
+                      accessibilityLabel="View Detailed Question Report"
+                      accessibilityRole="button"
+                      style={styles.viewReportButton}
+                    >
+                      <Text style={styles.viewReportButtonText}>
+                        📋 {t('sessionComplete.viewDetailedReport', t('common.viewReport', 'View Detailed Report'))}
+                      </Text>
+                    </BigTouchTarget>
+                  )}
+                </IslandPanel>
 
                 {/* Required 3 Actions: Play Again, Choose Game, Dashboard */}
                 <Animated.View style={[styles.actionsWrapper, buttonsAnimStyle]}>
@@ -413,16 +475,26 @@ const styles = StyleSheet.create({
   viewReportButton: {
     backgroundColor: '#EFF6FF',
     borderWidth: 1.5,
-    borderColor: '#BFDBFE',
+    borderColor: '#93C5FD',
     borderRadius: WorldRadii.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginVertical: WorldSpacing.xs,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    marginTop: WorldSpacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+    width: '90%',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   viewReportButtonText: {
     fontFamily: WorldTypography.fonts.bold,
-    fontSize: 12,
+    fontSize: 13,
     color: '#1D4ED8',
+    textAlign: 'center',
   },
   actionsWrapper: {
     width: '100%',
@@ -449,5 +521,51 @@ const styles = StyleSheet.create({
     fontFamily: WorldTypography.fonts.bold,
     fontSize: 13,
     color: WorldPalettes.text.secondary,
+  },
+  quitEarlyBadge: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    borderRadius: WorldRadii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 6,
+    alignSelf: 'center',
+  },
+  quitEarlyBadgeText: {
+    fontFamily: WorldTypography.fonts.bold,
+    fontSize: 13,
+    color: '#B45309',
+  },
+  zeroActivityCard: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1.5,
+    borderColor: '#93C5FD',
+    borderRadius: WorldRadii.md,
+    padding: WorldSpacing.sm,
+    marginVertical: WorldSpacing.xs,
+    width: '100%',
+    alignItems: 'center',
+  },
+  zeroActivityNotice: {
+    fontFamily: WorldTypography.fonts.medium,
+    fontSize: 13,
+    color: '#1E40AF',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  summaryPill: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: WorldRadii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginTop: WorldSpacing.xs,
+    alignSelf: 'center',
+  },
+  summaryPillText: {
+    fontFamily: WorldTypography.fonts.medium,
+    fontSize: 11,
+    color: '#475569',
+    textAlign: 'center',
   },
 });

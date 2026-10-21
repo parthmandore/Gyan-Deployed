@@ -73,7 +73,10 @@ export const GameScreen: React.FC = React.memo(() => {
   const { width: screenWidth } = useWindowDimensions();
 
   // Unified Session Lifecycle
+  const handleEarlyQuitRef = useRef<() => void>(() => {});
+
   const lifecycle = useGameSessionLifecycle({
+    onQuitToReport: () => handleEarlyQuitRef.current(),
     gameId: 'language_pair_match',
     screenName: 'LanguagePairMatchGame',
     onQuitModalToggle: (visible) => setShowExitModal(visible),
@@ -446,6 +449,10 @@ export const GameScreen: React.FC = React.memo(() => {
     (card: MatchCard) => {
       if (interactionLocked || matchedConceptIds.includes(card.conceptId)) return;
 
+      if (card.text) {
+        speakPhrase(card.text, { language: motherTongue, cancelPrevious: true });
+      }
+
       if (selectedTargetId && currentRound) {
         // A target card was already selected -> Evaluate match
         const targetCard = currentRound.targetCards.find((c) => c.cardId === selectedTargetId);
@@ -469,6 +476,10 @@ export const GameScreen: React.FC = React.memo(() => {
   const handleTargetCardPress = useCallback(
     (card: MatchCard) => {
       if (interactionLocked || matchedConceptIds.includes(card.conceptId)) return;
+
+      if (card.text) {
+        speakPhrase(card.text, { language: learningLanguage, cancelPrevious: true });
+      }
 
       if (selectedSourceId && currentRound) {
         // A source card was already selected -> Evaluate match
@@ -494,6 +505,10 @@ export const GameScreen: React.FC = React.memo(() => {
     (card: MatchCard, row: 'source' | 'target', startX: number, startY: number) => {
       if (interactionLocked) return;
       setIsDragging(true);
+
+      if (card.text) {
+        speakPhrase(card.text, { language: row === 'source' ? motherTongue : learningLanguage, cancelPrevious: true });
+      }
 
       if (row === 'source') {
         selectSource(card.cardId);
@@ -664,9 +679,42 @@ export const GameScreen: React.FC = React.memo(() => {
   );
 
   // Quit confirmation
+  
+  const handleEarlyQuitToReport = useCallback(() => {
+    lifecycle.exitToReport(() => {
+      stopSpeech();
+      audioManager.stopAllGameAudio();
+
+      const storeState = useLanguagePairMatchStore.getState();
+      const finalCorrect = storeState.itemsCorrect;
+      const finalAttempted = storeState.itemsAttempted;
+      const totalLength = TOTAL_SESSION_PAIRS;
+      const accuracy = finalAttempted > 0 ? Math.round((finalCorrect / finalAttempted) * 100) : 0;
+      const starsEarned = finalCorrect >= 8 ? 3 : finalCorrect >= 4 ? 2 : finalCorrect >= 1 ? 1 : 0;
+      const xpEarned = storeState.score;
+
+      navigation.navigate('LanguagePairMatchSessionComplete', {
+        sessionId: sessionIdRef.current,
+        starsEarned,
+        xpEarned,
+        itemsCorrect: finalCorrect,
+        sessionLength: totalLength,
+        itemsAttempted: finalAttempted,
+        accuracy,
+        durationSeconds: 60,
+        roundAttempts: storeState.roundAttempts,
+        isAbandoned: true,
+      });
+    });
+  }, [lifecycle, navigation]);
+
+  useEffect(() => {
+    handleEarlyQuitRef.current = handleEarlyQuitToReport;
+  }, [handleEarlyQuitToReport]);
+
   const handleConfirmQuit = () => {
     setShowExitModal(false);
-    lifecycle.exitSession('GameCatalog');
+    handleEarlyQuitToReport();
   };
 
   const containerWidth = Math.min(screenWidth - 24, 440);

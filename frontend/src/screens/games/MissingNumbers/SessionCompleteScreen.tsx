@@ -13,7 +13,9 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { GameSessionCompleteView } from '../../../components';
+import { navigateToGameCatalog, navigateToChildDashboard } from '../../../navigation/navigationHelpers';
 import { GameAnalysisReportModal, GameQuestionReportItem } from '../../../components/GameAnalysisReportModal';
+import { buildStandardizedReportItems } from '../../../utils/gameReportAdapter';
 import { useAppLanguageStore } from '../../../state/appLanguageStore';
 import { useProgressStore } from '../../../state/useProgressStore';
 import { useMissingNumbersStore } from './store/useMissingNumbersStore';
@@ -47,6 +49,8 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
     sessionLength = 5,
     accuracy = 100,
   } = (route.params as any) || {};
+  const isAbandoned = ((route.params as any) || {}).isAbandoned === true;
+  const itemsAttempted = ((route.params as any) || {}).itemsAttempted !== undefined ? ((route.params as any) || {}).itemsAttempted : sessionLength;
 
   const hasSubmittedRef = useRef(false);
 
@@ -60,7 +64,9 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
       learningLanguage,
       motherTongue,
       age: selectedAge,
-      itemsAttempted: sessionLength,
+      itemsAttempted: isAbandoned ? itemsAttempted : sessionLength,
+      isAbandoned,
+      completed: !isAbandoned,
       itemsCorrect,
       accuracy,
       starsEarned,
@@ -70,8 +76,10 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   }, [itemsCorrect, sessionLength, accuracy, starsEarned, xpEarned, learningLanguage, motherTongue, selectedAge]);
 
   useEffect(() => {
-    const praiseText = t('missingNumbers.sessionCompletePraise', { lng: motherTongue });
+    if (!isAbandoned) {
+      const praiseText = t('missingNumbers.sessionCompletePraise', { lng: motherTongue });
     speakPhrase(praiseText, { language: motherTongue });
+    }
 
     const unsubscribe = navigation.addListener('beforeRemove', () => {
       stopSpeech();
@@ -92,24 +100,23 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
   const handleBackToDashboard = () => {
     stopSpeech();
     resetGame();
-    navigation.navigate('ChildDashboard' as any);
+    navigateToChildDashboard(navigation);
   };
 
   const handleBackToCatalog = () => {
     stopSpeech();
     resetGame();
-    navigation.navigate('GameCatalog' as any);
+    navigateToGameCatalog(navigation);
   };
 
-  const reportItems: GameQuestionReportItem[] = attempts.map((att) => ({
-    roundNumber: att.roundNumber,
-    questionLabel: `Round ${att.roundNumber}: Missing Number`,
-    userAnswer: String(att.selectedValue),
-    correctAnswer: String(att.correctValue),
-    isCorrect: att.isCorrect,
-    attemptsCount: att.attemptCount,
-    xpEarned: att.isCorrect ? 10 : 0,
-  }));
+  const reportSummary = buildStandardizedReportItems({
+    sessionLength,
+    itemsAttempted,
+    isAbandoned,
+    attempts,
+    fallbackLabelPrefix: 'Number Sequence',
+  });
+  const reportItems = reportSummary.items;
 
   return (
     <View style={styles.root}>
@@ -121,9 +128,11 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         accuracy={accuracy}
         xpEarned={xpEarned}
         onPlayAgain={handlePlayAgain}
+        isAbandoned={isAbandoned}
+        itemsAttempted={itemsAttempted}
         onChooseGame={handleBackToCatalog}
         onReturnToDashboard={handleBackToDashboard}
-        onViewReport={reportItems.length > 0 ? () => setShowReportModal(true) : undefined}
+        onViewReport={() => setShowReportModal(true)}
         bgTheme="math"
       />
 
@@ -131,6 +140,15 @@ export const SessionCompleteScreen: React.FC = React.memo(() => {
         visible={showReportModal}
         onClose={() => setShowReportModal(false)}
         gameTitle={t('games.missingNumbers.title', 'Missing Numbers')}
+        isAbandoned={isAbandoned}
+        totalQuestions={reportSummary.totalQuestions}
+        questionsAttempted={reportSummary.questionsAttempted}
+        firstTryCorrectCount={reportSummary.firstTryCorrectCount}
+        correctedAfterRetryCount={reportSummary.correctedAfterRetryCount}
+        stillIncorrectCount={reportSummary.stillIncorrectCount}
+        unansweredCount={reportSummary.unansweredCount}
+        accuracy={accuracy ?? reportSummary.accuracy}
+        xpEarned={xpEarned}
         items={reportItems}
       />
     </View>

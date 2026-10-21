@@ -816,6 +816,208 @@ function generateVisualReasoningRound(roundNumber: number): AptitudeQuestion {
 }
 
 // -------------------------------------------------------------
+// 8. DIRECTION ARROW GENERATOR (Ages 5-6)
+// -------------------------------------------------------------
+interface DirectionPreset {
+  arrow: string;
+  labelKey: string;
+  labelFallback: string;
+  opposite: string;
+}
+
+const DIRECTION_PRESETS: DirectionPreset[] = [
+  { arrow: '⬅️', labelKey: 'direction.left', labelFallback: 'Left ⬅️', opposite: '➡️' },
+  { arrow: '➡️', labelKey: 'direction.right', labelFallback: 'Right ➡️', opposite: '⬅️' },
+  { arrow: '⬆️', labelKey: 'direction.up', labelFallback: 'Up ⬆️', opposite: '⬇️' },
+  { arrow: '⬇️', labelKey: 'direction.down', labelFallback: 'Down ⬇️', opposite: '⬆️' },
+];
+
+function generateDirectionArrowRound(roundNumber: number): AptitudeQuestion {
+  const target = DIRECTION_PRESETS[(roundNumber - 1) % DIRECTION_PRESETS.length];
+  const others = DIRECTION_PRESETS.filter((p) => p.arrow !== target.arrow);
+
+  const options: AptitudeOption[] = shuffle([
+    { id: `opt_corr_${roundNumber}`, visual: target.arrow, label: target.labelFallback, isCorrect: true },
+    { id: `opt_d1_${roundNumber}`, visual: others[0].arrow, label: others[0].labelFallback, isCorrect: false },
+    { id: `opt_d2_${roundNumber}`, visual: others[1].arrow, label: others[1].labelFallback, isCorrect: false },
+    { id: `opt_d3_${roundNumber}`, visual: others[2].arrow, label: others[2].labelFallback, isCorrect: false },
+  ]);
+
+  return {
+    id: `q_dir_${roundNumber}_${Date.now()}`,
+    gameType: 'direction_arrow',
+    roundNumber,
+    promptKey: 'aptitudeChallenge.directionArrowPrompt',
+    promptFallback: 'Which way is the arrow pointing?',
+    spokenPhraseKey: 'aptitudeChallenge.directionArrowPrompt',
+    stimulusLayout: 'sequence',
+    stimulusTokens: [
+      { id: `stim_arrow_${roundNumber}`, visual: target.arrow, label: '?' },
+    ],
+    options,
+  };
+}
+
+// -------------------------------------------------------------
+// 9. COUNT AND COMPARE GENERATOR (Ages 5-6)
+// -------------------------------------------------------------
+interface ComparePreset {
+  groupAIcon: string;
+  groupACount: number;
+  groupBIcon: string;
+  groupBCount: number;
+  moreIsA: boolean;
+}
+
+const COMPARE_PRESETS: ComparePreset[] = [
+  { groupAIcon: '🍎', groupACount: 4, groupBIcon: '🍎', groupBCount: 2, moreIsA: true },
+  { groupAIcon: '⭐️', groupACount: 1, groupBIcon: '⭐️', groupBCount: 5, moreIsA: false },
+  { groupAIcon: '🌸', groupACount: 5, groupBIcon: '🌸', groupBCount: 3, moreIsA: true },
+  { groupAIcon: '🚗', groupACount: 2, groupBIcon: '🚗', groupBCount: 4, moreIsA: false },
+  { groupAIcon: '🍪', groupACount: 6, groupBIcon: '🍪', groupBCount: 2, moreIsA: true },
+  { groupAIcon: '🎈', groupACount: 3, groupBIcon: '🎈', groupBCount: 6, moreIsA: false },
+  { groupAIcon: '🍭', groupACount: 5, groupBIcon: '🍭', groupBCount: 1, moreIsA: true },
+  { groupAIcon: '⚽️', groupACount: 2, groupBIcon: '⚽️', groupBCount: 5, moreIsA: false },
+  { groupAIcon: '🍇', groupACount: 6, groupBIcon: '🍇', groupBCount: 3, moreIsA: true },
+  { groupAIcon: '🍊', groupACount: 1, groupBIcon: '🍊', groupBCount: 4, moreIsA: false },
+];
+
+function generateCountAndCompareRound(roundNumber: number): AptitudeQuestion {
+  const preset = COMPARE_PRESETS[(roundNumber - 1) % COMPARE_PRESETS.length];
+  const groupAVisual = Array(preset.groupACount).fill(preset.groupAIcon).join(' ');
+  const groupBVisual = Array(preset.groupBCount).fill(preset.groupBIcon).join(' ');
+
+  const options: AptitudeOption[] = shuffle([
+    {
+      id: `opt_a_${roundNumber}`,
+      visual: groupAVisual,
+      label: `${preset.groupACount} ${preset.groupAIcon}`,
+      isCorrect: preset.moreIsA,
+    },
+    {
+      id: `opt_b_${roundNumber}`,
+      visual: groupBVisual,
+      label: `${preset.groupBCount} ${preset.groupBIcon}`,
+      isCorrect: !preset.moreIsA,
+    },
+  ]);
+
+  return {
+    id: `q_compare_${roundNumber}_${Date.now()}`,
+    gameType: 'count_and_compare',
+    roundNumber,
+    promptKey: 'aptitudeChallenge.countAndComparePrompt',
+    promptFallback: 'Which group has MORE items?',
+    spokenPhraseKey: 'aptitudeChallenge.countAndComparePrompt',
+    stimulusLayout: 'comparison',
+    stimulusTokens: [
+      { id: `stim_comp_a`, visual: groupAVisual, label: `Group A` },
+      { id: `stim_comp_vs`, visual: '⚖️', label: 'vs' },
+      { id: `stim_comp_b`, visual: groupBVisual, label: `Group B` },
+    ],
+    options,
+  };
+}
+
+// -------------------------------------------------------------
+// 10. SHADOW MATCH GENERATOR (Ages 5-6)
+// -------------------------------------------------------------
+interface ShadowPreset {
+  silhouetteSymbol: string;
+  name: string;
+  correctObj: string;
+  distractors: { visual: string; name: string }[];
+}
+
+const SHADOW_PRESETS: ShadowPreset[] = [
+  {
+    silhouetteSymbol: '🐈‍⬛',
+    name: 'Cat',
+    correctObj: '🐱',
+    distractors: [{ visual: '🐶', name: 'Dog' }, { visual: '🐰', name: 'Rabbit' }, { visual: '🐸', name: 'Frog' }],
+  },
+  {
+    silhouetteSymbol: '✈️',
+    name: 'Airplane',
+    correctObj: '🛩️',
+    distractors: [{ visual: '🚗', name: 'Car' }, { visual: '🚀', name: 'Rocket' }, { visual: '⛵️', name: 'Boat' }],
+  },
+  {
+    silhouetteSymbol: '🐘',
+    name: 'Elephant',
+    correctObj: '🐘',
+    distractors: [{ visual: '🦒', name: 'Giraffe' }, { visual: '🦁', name: 'Lion' }, { visual: '🐻', name: 'Bear' }],
+  },
+  {
+    silhouetteSymbol: '🦋',
+    name: 'Butterfly',
+    correctObj: '🦋',
+    distractors: [{ visual: '🐝', name: 'Bee' }, { visual: '🐞', name: 'Ladybug' }, { visual: '🦗', name: 'Cricket' }],
+  },
+  {
+    silhouetteSymbol: '🐟',
+    name: 'Fish',
+    correctObj: '🐠',
+    distractors: [{ visual: '🦀', name: 'Crab' }, { visual: '🐙', name: 'Octopus' }, { visual: '🐬', name: 'Dolphin' }],
+  },
+  {
+    silhouetteSymbol: '🌲',
+    name: 'Tree',
+    correctObj: '🌳',
+    distractors: [{ visual: '🍄', name: 'Mushroom' }, { visual: '🌻', name: 'Flower' }, { visual: '🌵', name: 'Cactus' }],
+  },
+  {
+    silhouetteSymbol: '⭐️',
+    name: 'Star',
+    correctObj: '🌟',
+    distractors: [{ visual: '🌙', name: 'Moon' }, { visual: '☀️', name: 'Sun' }, { visual: '☁️', name: 'Cloud' }],
+  },
+  {
+    silhouetteSymbol: '🍎',
+    name: 'Apple',
+    correctObj: '🍎',
+    distractors: [{ visual: '🍌', name: 'Banana' }, { visual: '🍇', name: 'Grapes' }, { visual: '🍊', name: 'Orange' }],
+  },
+  {
+    silhouetteSymbol: '🚗',
+    name: 'Car',
+    correctObj: '🚘',
+    distractors: [{ visual: '🚌', name: 'Bus' }, { visual: '🚂', name: 'Train' }, { visual: '🚲', name: 'Bicycle' }],
+  },
+  {
+    silhouetteSymbol: '🦁',
+    name: 'Lion',
+    correctObj: '🦁',
+    distractors: [{ visual: '🐯', name: 'Tiger' }, { visual: '🐵', name: 'Monkey' }, { visual: '🐼', name: 'Panda' }],
+  },
+];
+
+function generateShadowMatchRound(roundNumber: number): AptitudeQuestion {
+  const preset = SHADOW_PRESETS[(roundNumber - 1) % SHADOW_PRESETS.length];
+
+  const options: AptitudeOption[] = shuffle([
+    { id: `opt_corr_${roundNumber}`, visual: preset.correctObj, label: preset.name, isCorrect: true },
+    { id: `opt_d1_${roundNumber}`, visual: preset.distractors[0].visual, label: preset.distractors[0].name, isCorrect: false },
+    { id: `opt_d2_${roundNumber}`, visual: preset.distractors[1].visual, label: preset.distractors[1].name, isCorrect: false },
+    { id: `opt_d3_${roundNumber}`, visual: preset.distractors[2].visual, label: preset.distractors[2].name, isCorrect: false },
+  ]);
+
+  return {
+    id: `q_shadow_${roundNumber}_${Date.now()}`,
+    gameType: 'shadow_match',
+    roundNumber,
+    promptKey: 'aptitudeChallenge.shadowMatchPrompt',
+    promptFallback: 'Which picture matches this shadow?',
+    spokenPhraseKey: 'aptitudeChallenge.shadowMatchPrompt',
+    stimulusLayout: 'sequence',
+    stimulusTokens: [
+      { id: `stim_shadow_${roundNumber}`, visual: preset.silhouetteSymbol, label: 'Shadow' },
+    ],
+    options,
+  };
+}
+
+// -------------------------------------------------------------
 // MAIN SESSION GENERATOR
 // -------------------------------------------------------------
 export function generateAptitudeSession(gameType: AptitudeGameType): AptitudeRound[] {
@@ -845,6 +1047,15 @@ export function generateAptitudeSession(gameType: AptitudeGameType): AptitudeRou
         break;
       case 'visual_reasoning':
         question = generateVisualReasoningRound(roundNumber);
+        break;
+      case 'direction_arrow':
+        question = generateDirectionArrowRound(roundNumber);
+        break;
+      case 'count_and_compare':
+        question = generateCountAndCompareRound(roundNumber);
+        break;
+      case 'shadow_match':
+        question = generateShadowMatchRound(roundNumber);
         break;
       default:
         question = generatePatternMatchRound(roundNumber);

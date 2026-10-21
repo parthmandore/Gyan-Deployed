@@ -221,6 +221,42 @@
     "sentenceCorrection": {
       "title": "अचूक वाक्य निवड",
       "description": "व्याकरणदृष्ट्या योग्य आणि अचूक वाक्य ओळखा!"
+    },
+    "beginnerAddition": {
+      "title": "मोजा आणि बेरीज करा",
+      "description": "वस्तू मोजा आणि त्यांची बेरीज करून एकूण उत्तर सांगा!"
+    },
+    "beginnerSubtraction": {
+      "title": "वजा करा आणि शिका",
+      "description": "वस्तू कमी करा आणि किती उरले ते शोधा!"
+    },
+    "directionArrow": {
+      "title": "दिशेचा बाण",
+      "description": "रंगीबेरंगी बाण पहा आणि ते कोणत्या दिशेला आहेत ते ओळखा!"
+    },
+    "countAndCompare": {
+      "title": "मोजा आणि तुलना करा",
+      "description": "दोन गटांची तुलना करा आणि कशात जास्त आहेत ते सांगा!"
+    },
+    "shadowMatch": {
+      "title": "सावली जोडी",
+      "description": "प्राणी आणि खेळण्यांना त्यांच्या काळ्या सावलीशी जोडा!"
+    },
+    "oppositeWords": {
+      "title": "विरुद्धार्थी शब्द",
+      "description": "मोठा-लहान, गरम-थंड आणि दिवस-रात्र असे शब्द शिका!"
+    },
+    "rhymingWords": {
+      "title": "यमक जुळणारे शब्द",
+      "description": "सारख्या आवाजाचे यमक जुळणारे शब्द शोधा जसे पाणी-गाणी!"
+    },
+    "actionWords": {
+      "title": "क्रियापद (कृती शब्द)",
+      "description": "धावणे, नाचणे, खाणे आणि झोपणे हे कृती शब्द ओळखा!"
+    },
+    "genderNouns": {
+      "title": "लिंग बदला",
+      "description": "मुलगा-मुलगी आणि राजा-राणी या जोड्या जुळवा!"
     }
   },
   "alphabetMatching": {
@@ -314,7 +350,44 @@
     "level": "पातळी {{level}}",
     "xpToNextLevel": "पुढील पातळीसाठी {{xp}} XP",
     "nextLevel": "पुढील पातळी",
-    "home": "मुख्य पृष्ठ"
+    "home": "मुख्य पृष्ठ",
+    "quitEarlyBadge": "⏱️ लवकर सोडले",
+    "quitEarlyPraise": "छान सराव सत्र! 👍",
+    "zeroActivityTitle": "सत्र लवकर संपले 👋",
+    "zeroActivityNotice": "या वेळी कोणताही प्रश्न सोडवला नाही. तुम्ही तयार असाल तेव्हा खेळा!",
+    "attempted": "प्रयत्न केले",
+    "unanswered": "अनुत्तरित",
+    "viewDetailedReport": "तपशीलवार अहवाल पहा"
+  },
+  "detailedReport": {
+    "titleSuffix": "अहवाल",
+    "sessionReport": "सत्र अहवाल",
+    "completed": "✅ पूर्ण",
+    "subtitle": "प्रत्येक प्रश्न आणि पुन्हा प्रयत्नांचे तपशील पहा!",
+    "attempted": "प्रयत्न केले",
+    "filterAll": "सर्व",
+    "filter1stTry": "पहिला प्रयत्न",
+    "filterRetry": "पुन्हा प्रयत्न",
+    "filterPractice": "सराव",
+    "filterUnanswered": "अनुत्तरित",
+    "noMistakes": "छान काम! या वर्गात कोणतीही चूक नाही!",
+    "noQuestions": "या दृश्यात दाखवण्यासाठी कोणतेही प्रश्न नाहीत.",
+    "roundLabel": "फेरी",
+    "statusUnanswered": "अनुत्तरित",
+    "statusCorrectAfterRetry": "पुन्हा प्रयत्नात बरोबर",
+    "statusFirstTry": "पहिल्या प्रयत्नात बरोबर",
+    "statusPractice": "सराव आवश्यक",
+    "attemptHistory": "प्रयत्न इतिहास:",
+    "attempt": "प्रयत्न",
+    "yourAnswer": "तुमचे उत्तर:",
+    "notAttempted": "— प्रयत्न केला नाही —",
+    "correctAnswer": "बरोबर उत्तर:"
+  },
+  "loginLanguage": {
+    "appLanguageTitle": "ॲप भाषा (इंटरफेस)",
+    "appLanguageSubtitle": "ॲपने तुमच्याशी कोणत्या भाषेत बोलावे?",
+    "learningLanguageTitle": "शिकायची भाषा (खेळ)",
+    "learningLanguageSubtitle": "तुम्हाला सर्व खेळांमध्ये कोणती भाषा शिकायची आहे?"
   },
   "accessibility": {
     "correctCelebration": "बरोबर उत्तराचा आनंद",
@@ -485,7 +558,15 @@
     "howToPlaySubtraction": "1. वजाबाकीचे समीकरण पाहा.\n2. पहिल्या संख्येतून दुसरी संख्या वजा करा.\n3. योग्य उत्तराच्या कार्डवर टॅप करा.\n4. 3 तारे मिळवण्यासाठी सर्व 5 फेऱ्या पूर्ण करा! ⭐",
     "howToPlayBiggerAddition": "1. दोन अंकी बेरजेचे समीकरण पाहा.\n2. एकक आणि दशक यांची काळजीपूर्वक बेरीज करा.\n3. योग्य बेरजेच्या कार्डवर टॅप करा.\n4. 3 तारे मिळवण्यासाठी सर्व 5 फेऱ्या पूर्ण करा! ⭐",
     "howToPlayMultiplication": "1. गुणाकाराचे समीकरण पाहा.\n2. पाढ्यांचा वापर करून गुणाकार करा.\n3. अचूक उत्तराच्या कार्डवर टॅप करा.\n4. 3 तारे मिळवण्यासाठी सर्व 5 फेऱ्या पूर्ण करा! ⭐",
-    "howToPlayDivision": "1. भागाकाराचे समीकरण पाहा.\n2. संख्येचे समान गट करा.\n3. अचूक उत्तराच्या कार्डवर टॅप करा.\n4. 3 तारे मिळवण्यासाठी सर्व 5 फेऱ्या पूर्ण करा! ⭐"
+    "howToPlayDivision": "1. भागाकाराचे समीकरण पाहा.\n2. संख्येचे समान गट करा.\n3. अचूक उत्तराच्या कार्डवर टॅप करा.\n4. 3 तारे मिळवण्यासाठी सर्व 5 फेऱ्या पूर्ण करा! ⭐",
+    "beginnerAdditionTitle": "मोजा आणि बेरीज करा",
+    "beginnerAdditionHero": "मोजा आणि बेरीज करा!",
+    "beginnerAdditionDesc": "दोन्ही बाजूंच्या वस्तू मोजा आणि बेरीज करून उत्तर द्या!",
+    "howToPlayBeginnerAddition": "पहिल्या आणि दुसऱ्या गटातील वस्तू मोजा आणि बरोबर उत्तर निवडा!",
+    "beginnerSubtractionTitle": "वजाबाकीची मजा",
+    "beginnerSubtractionHero": "वजाबाकीची मजा!",
+    "beginnerSubtractionDesc": "वस्तू वजा करा आणि किती उरल्या ते सांगा!",
+    "howToPlayBeginnerSubtraction": "एकूण वस्तूंमधून वजा केलेल्या वस्तू काढा आणि उत्तर निवडा!"
   },
   "aptitudeChallenge": {
     "title": "तर्क आणि बुद्धिमत्ता",
@@ -542,7 +623,19 @@
     "mascotSpeech": "तुम्ही तयार आहात का? खेळण्यासाठी सुरू करा वर टॅप करा!",
     "highlight5Rounds": "5 जलद आव्हाने",
     "highlightStars": "तारे आणि XP मिळवा",
-    "highlightPraise": "मुलांसाठी सोपे संकेत"
+    "highlightPraise": "मुलांसाठी सोपे संकेत",
+    "directionArrowHero": "बाणाची दिशा ओळखा!",
+    "directionArrowDesc": "डावी, उजवी, वर आणि खाली या दिशा बाणांवरून शिका!",
+    "howToPlayDirectionArrow": "बाण कोणत्या दिशेला आहे ते पाहून योग्य उत्तरावर टॅप करा!",
+    "directionArrowPrompt": "हा बाण कोणत्या दिशेला दाखवत आहे?",
+    "countAndCompareHero": "कमी की जास्त स्पर्धा!",
+    "countAndCompareDesc": "गटांची तुलना करा आणि कशात जास्त वस्तू आहेत ते शोधा!",
+    "howToPlayCountAndCompare": "दोन्ही गट मोजा आणि ज्या गटात जास्त आहेत तो गट निवडा!",
+    "countAndComparePrompt": "कोणत्या गटात जास्त वस्तू आहेत?",
+    "shadowMatchHero": "सावली गुप्तहेर!",
+    "shadowMatchDesc": "प्रत्येक चित्र त्याच्या काळ्या सावलीशी जुळवा!",
+    "howToPlayShadowMatch": "सावलीचा आकार बारकाईने पहा आणि जुळणारे चित्र निवडा!",
+    "shadowMatchPrompt": "या सावलीशी जुळणारे चित्र कोणते?"
   },
   "grammarChallenge": {
     "title": "मूलभूत व्याकरण",
@@ -591,7 +684,23 @@
     "mascotSpeech": "तुम्ही तयार आहात का? खेळण्यासाठी सुरू करा वर टॅप करा!",
     "highlight5Questions": "5 बालसुलभ प्रश्न",
     "highlightStars": "तारे आणि व्याकरण XP मिळवा",
-    "highlightPraise": "झटपट प्रतिसाद आणि ऑडिओ"
+    "highlightPraise": "झटपट प्रतिसाद आणि ऑडिओ",
+    "oppositeWordsHero": "विरुद्ध शब्दांचे जग!",
+    "oppositeWordsDesc": "गरम-थंड, मोठा-लहान आणि दिवस-रात्र असे विरुद्धार्थी शब्द जोडा!",
+    "howToPlayOppositeWords": "शब्द वाचा आणि त्याचा अचूक विरुद्धार्थी शब्द निवडा!",
+    "oppositeWordsPrompt": "या शब्दाचा विरुद्धार्थी शब्द ओळखा!",
+    "rhymingWordsHero": "यमक जुळवा!",
+    "rhymingWordsDesc": "शेवटी सारखा आवाज येणारे शब्द शोधा जसे पाणी-गाणी!",
+    "howToPlayRhymingWords": "शब्द मोठ्याने म्हणा आणि यमक जुळणारा शब्द निवडा!",
+    "rhymingWordsPrompt": "या शब्दाशी यमक जुळणारा शब्द कोणता?",
+    "actionWordsHero": "क्रियापद वीर!",
+    "actionWordsDesc": "चित्रात काय कृती घडत आहे ते ओळखा: धावणे, नाचणे की खाणे!",
+    "howToPlayActionWords": "चित्रात होणारी कृती पहा आणि योग्य क्रियापद निवडा!",
+    "actionWordsPrompt": "येथे कोणती कृती घडत आहे?",
+    "genderNounsHero": "लिंग बदला!",
+    "genderNounsDesc": "मुलगा-मुलगी आणि राजा-राणी यासारख्या जोड्या जुळवा!",
+    "howToPlayGenderNouns": "शब्द वाचा आणि त्याची योग्य लिंग जोडी निवडा!",
+    "genderNounsPrompt": "योग्य जोडी (पुल्लिंग / स्त्रीलिंग) निवडा!"
   },
   "missingLetters": {
     "title": "गाळलेली अक्षरे 🔤",

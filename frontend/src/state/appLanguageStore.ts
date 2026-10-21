@@ -210,6 +210,10 @@ export const useAppLanguageStore = create<AppLanguageState>((set, get) => ({
     console.log(`[LANGUAGE DEBUG] setLearningLanguage: ${lang}`);
     set({ learningLanguage: lang });
     await setPersistedLearningLanguage(lang);
+    try {
+      const { LanguageManager } = require('../language/LanguageManager');
+      await LanguageManager.setLanguage(lang);
+    } catch {}
   },
 
   setAppLanguage: async (lang: AppLanguage) => {
@@ -262,6 +266,11 @@ export const useAppLanguageStore = create<AppLanguageState>((set, get) => ({
       setPersistedLearningLanguage(learningLang),
       setPersistedAge(age),
     ]);
+
+    try {
+      const { LanguageManager } = require('../language/LanguageManager');
+      await LanguageManager.setLanguage(learningLang);
+    } catch {}
 
     const i18nInstance = getI18n();
     if (i18nInstance && typeof i18nInstance.changeLanguage === 'function') {

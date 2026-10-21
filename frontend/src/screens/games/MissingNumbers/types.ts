@@ -57,5 +57,7 @@ export type MissingNumbersStackParamList = {
     sessionLength: number;
     accuracy: number;
     isTimeExpired?: boolean;
-  };
+    isAbandoned?: boolean;
+  itemsAttempted?: number;
+};
 };

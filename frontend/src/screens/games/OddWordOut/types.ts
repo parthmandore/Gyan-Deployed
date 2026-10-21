@@ -46,6 +46,8 @@ export interface OddWordOutSessionResults {
   sessionLength: number;
   accuracy: number;
   isTimeExpired?: boolean;
+  isAbandoned?: boolean;
+  itemsAttempted?: number;
 }
 
 export type OddWordOutStackParamList = {

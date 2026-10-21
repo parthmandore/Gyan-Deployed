@@ -7,14 +7,14 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { navigateToGameCatalog } from '../../../navigation/navigationHelpers';
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
   ScrollView,
-  useWindowDimensions,
-} from 'react-native';
+  useWindowDimensions, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -107,11 +107,51 @@ const TOPIC_METADATA: Record<
     ageBadge: '🏆 Age 7: Fix Sentence',
     accentColor: '#059669',
   },
+  opposite_words: {
+    heroKey: 'grammarChallenge.oppositeWordsHero',
+    descKey: 'grammarChallenge.oppositeWordsDesc',
+    howToPlayKey: 'grammarChallenge.howToPlayOppositeWords',
+    icon: '🔄',
+    ageBadge: '⭐ All Ages: Opposites',
+    accentColor: '#F59E0B',
+  },
+  rhyming_words: {
+    heroKey: 'grammarChallenge.rhymingWordsHero',
+    descKey: 'grammarChallenge.rhymingWordsDesc',
+    howToPlayKey: 'grammarChallenge.howToPlayRhymingWords',
+    icon: '🎵',
+    ageBadge: '⭐ Age 6: Rhyming Words',
+    accentColor: '#EC4899',
+  },
+  action_words: {
+    heroKey: 'grammarChallenge.actionWordsHero',
+    descKey: 'grammarChallenge.actionWordsDesc',
+    howToPlayKey: 'grammarChallenge.howToPlayActionWords',
+    icon: '🏃',
+    ageBadge: '⭐ Age 6: Action Words',
+    accentColor: '#10B981',
+  },
+  gender_nouns: {
+    heroKey: 'grammarChallenge.genderNounsHero',
+    descKey: 'grammarChallenge.genderNounsDesc',
+    howToPlayKey: 'grammarChallenge.howToPlayGenderNouns',
+    icon: '👫',
+    ageBadge: '🏆 Age 7: Gender Nouns',
+    accentColor: '#8B5CF6',
+  },
 };
 
 export const IntroScreen: React.FC = React.memo(() => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavProp>();
+  useEffect(() => {
+    const onBackPress = () => {
+      navigateToGameCatalog(navigation);
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [navigation]);
   const route = useRoute<RouteProps>();
   const { width: screenWidth } = useWindowDimensions();
 
@@ -141,11 +181,7 @@ export const IntroScreen: React.FC = React.memo(() => {
 
   const handleGoBack = () => {
     stopSpeech();
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      (navigation as any).navigate('GameCatalog');
-    }
+    navigateToGameCatalog(navigation);
   };
 
   return (

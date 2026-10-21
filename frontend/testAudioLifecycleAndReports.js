@@ -167,11 +167,11 @@ async function main() {
     fs.statSync(path.join(gamesDir, f)).isDirectory()
   );
 
-  runTest(`3.1: Inventory verification: exactly 19 games exist`, () => {
-    assert.strictEqual(allGames.length, 19, `Expected exactly 19 games, found ${allGames.length}`);
+  runTest(`3.1: Inventory verification: exactly 18 game engine directories exist`, () => {
+    assert.strictEqual(allGames.length, 18, `Expected exactly 18 games, found ${allGames.length}`);
   });
 
-  runTest('3.2: 100% of the 19 games have SessionCompleteScreen.tsx', () => {
+  runTest('3.2: 100% of the 18 games have SessionCompleteScreen.tsx', () => {
     for (const game of allGames) {
       const completePath = path.join(gamesDir, game, 'SessionCompleteScreen.tsx');
       assert(fs.existsSync(completePath), `${game} must have SessionCompleteScreen.tsx`);
